@@ -95,7 +95,7 @@ async function renderTimeline() {
   } catch {
     setStatus(false);
   }
-  list.sort((a, b) => new Date(a.arrive) - new Date(b.arrive));
+  list.sort((a, b) => new Date(a.arrive) - new Date(b.arrive) || new Date(a.announceAt) - new Date(b.announceAt));
 
   const container = $('#timeline');
   container.innerHTML = '';
