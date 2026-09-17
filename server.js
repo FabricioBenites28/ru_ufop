@@ -32,7 +32,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
   });
 }
 
-let db = { announcements: [], subscriptions: [] };
+let db = { announcements: [], menus: [], subscriptions: [] };
 
 async function loadData() {
   if (redis) {
@@ -47,7 +47,7 @@ async function loadData() {
   try {
     db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   } catch {
-    db = { announcements: [], subscriptions: [] };
+    db = { announcements: [], menus: [], subscriptions: [] };
   }
 }
 
@@ -163,6 +163,44 @@ app.post('/api/announce', async (req, res) => {
   await save();
   sendPush(name, `Vai comer no RU ${info.label}`);
   res.json(announcement);
+});
+
+app.get('/api/menu', (req, res) => {
+  const menus = (db.menus || []).slice(-40).sort((a, b) => b.date.localeCompare(a.date));
+  res.json(menus);
+});
+
+app.post('/api/menu', async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 80);
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'e-mail UFOP inválido' });
+  const meal = String(req.body.meal || '');
+  if (!['almoço', 'jantar'].includes(meal)) return res.status(400).json({ error: 'refeição inválida' });
+  const date = String(req.body.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'data inválida' });
+  const items = Array.isArray(req.body.items)
+    ? req.body.items
+        .map((i) => ({
+          text: String(i.text || '').trim().slice(0, 80),
+          veg: !!i.veg,
+          lactose: !!i.lactose,
+        }))
+        .filter((i) => i.text)
+    : [];
+  if (!items.length) return res.status(400).json({ error: 'cardápio vazio' });
+  const dateLabel = String(req.body.dateLabel || date).trim().slice(0, 60);
+  db.menus = (db.menus || []).filter((m) => !(m.meal === meal && m.date === date));
+  const menu = {
+    id: crypto.randomUUID(),
+    meal,
+    date,
+    dateLabel,
+    items,
+    addedBy: email,
+    addedAt: new Date().toISOString(),
+  };
+  db.menus.push(menu);
+  await save();
+  res.json(menu);
 });
 
 app.post('/api/subscribe', async (req, res) => {

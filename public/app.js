@@ -2,6 +2,7 @@ const $ = (s) => document.querySelector(s);
 
 const MODAL_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120];
 const DAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const WEEKDAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const EMAIL_RE = /^[a-z0-9._%+\-]+@(?:aluno\.)?ufop\.edu\.br$/i;
 
 const state = {
@@ -10,6 +11,8 @@ const state = {
   mode: 'in',
   minutes: 30,
   exact: '19:00',
+  menuTab: null,
+  pendingMenu: null,
 };
 
 localStorage.setItem('ru_userId', state.userId);
@@ -222,12 +225,239 @@ function start() {
   $('#confirmBtn').addEventListener('click', confirmAnnounce);
   $('#exactTime').addEventListener('change', (e) => { state.exact = e.target.value; syncModal(); });
 
+  $('#detectBtn').addEventListener('click', refreshMenuPreview);
+  $('#mealSelect').addEventListener('change', refreshMenuPreview);
+  $('#menuText').addEventListener('input', refreshMenuPreview);
+  $('#menuCancel').addEventListener('click', closeMenuModal);
+  $('#menuSave').addEventListener('click', saveMenu);
+
   setInterval(renderTimeline, 30000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) renderTimeline();
+    if (!document.hidden) { renderTimeline(); renderMenu(); }
   });
   renderTimeline();
+  renderMenu();
   enablePush();
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function nowMeal() {
+  return new Date().getHours() < 15 ? 'almoço' : 'jantar';
+}
+
+function parseMenuText(raw) {
+  const text = raw || '';
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  let meal = null;
+  const mm = text.match(/card[aá]pio\s+do\s+(alm[oô]ço|jantar)/i);
+  if (mm) meal = mm[1].toLowerCase().includes('jantar') ? 'jantar' : 'almoço';
+  let date = todayStr();
+  let dateLabel = '';
+  const dm = text.match(/dia\s+(\d{1,2})\s*[/\-]\s*(\d{1,2})\s*[/\-]\s*(\d{4})/i);
+  if (dm) {
+    const d = Number(dm[1]);
+    const m = Number(dm[2]);
+    const y = Number(dm[3]);
+    date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    dateLabel = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`;
+  }
+  const items = [];
+  for (const line of lines) {
+    if (/card[aá]pio\s+do\s+(alm[oô]ço|jantar)/i.test(line)) continue;
+    if (/cont[eé]m\s*lactose/i.test(line)) continue;
+    const clean = line.replace(/^[•\-\*\s]+/, '').replace(/\s+/g, ' ').trim();
+    if (!clean) continue;
+    items.push({
+      text: clean.replace(/\*+/g, '').trim(),
+      veg: /vegetariano/i.test(clean),
+      lactose: /\*/.test(clean) || /lactose/i.test(clean),
+    });
+  }
+  return { meal, date, dateLabel, items };
+}
+
+function tagify(li, item) {
+  if (item.veg) {
+    const s = document.createElement('span');
+    s.className = 'tag veg';
+    s.textContent = 'vegetariano';
+    li.appendChild(s);
+  }
+  if (item.lactose) {
+    const s = document.createElement('span');
+    s.className = 'tag lac';
+    s.textContent = 'lactose';
+    li.appendChild(s);
+  }
+}
+
+function openMenuModal(meal) {
+  if (meal) $('#mealSelect').value = meal;
+  $('#menuText').value = '';
+  $('#menuPreview').classList.add('hidden');
+  state.pendingMenu = null;
+  $('#menuModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  $('#menuText').focus();
+}
+
+function closeMenuModal() {
+  $('#menuModal').classList.add('hidden');
+  $('#menuPreview').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function refreshMenuPreview() {
+  const p = parseMenuText($('#menuText').value);
+  p.meal = $('#mealSelect').value;
+  const prev = $('#menuPreview');
+  if (!p.items.length) {
+    prev.classList.add('hidden');
+    state.pendingMenu = null;
+    return;
+  }
+  state.pendingMenu = p;
+  prev.classList.remove('hidden');
+  prev.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'fv';
+  const meal = p.meal === 'jantar' ? 'Jantar' : 'Almoço';
+  head.textContent = `${meal} · ${p.dateLabel || p.date} · ${p.items.length} itens`;
+  prev.appendChild(head);
+  const ul = document.createElement('ul');
+  ul.className = 'menu-items';
+  for (const it of p.items.slice(0, 24)) {
+    const li = document.createElement('li');
+    li.textContent = it.text;
+    tagify(li, it);
+    ul.appendChild(li);
+  }
+  prev.appendChild(ul);
+}
+
+async function saveMenu() {
+  const p = state.pendingMenu;
+  if (!p) return;
+  $('#menuSave').textContent = 'Salvando…';
+  $('#menuSave').disabled = true;
+  try {
+    const resp = await fetch('/api/menu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: state.email,
+        meal: p.meal,
+        date: p.date,
+        dateLabel: p.dateLabel,
+        items: p.items,
+      }),
+    });
+    if (!resp.ok) throw new Error('invalid');
+    closeMenuModal();
+    state.menuTab = p.meal;
+    toast('Cardápio salvo! 🍽️');
+    renderMenu();
+  } catch {
+    toast('Falha ao salvar. Tente de novo.');
+  }
+  $('#menuSave').textContent = 'Salvar cardápio';
+  $('#menuSave').disabled = false;
+}
+
+async function renderMenu() {
+  let menus = [];
+  try {
+    menus = await (await fetch('/api/menu')).json();
+  } catch {
+    return;
+  }
+  menus.sort((a, b) => b.date.localeCompare(a.date));
+  const container = $('#menuSection');
+  container.innerHTML = '';
+
+  if (!menus.length) {
+    const card = document.createElement('div');
+    card.className = 'card menu empty-menu';
+    const title = document.createElement('div');
+    title.className = 'menu-title';
+    title.textContent = '🍽️ Cardápio';
+    const sub = document.createElement('p');
+    sub.className = 'sub';
+    sub.textContent = 'O cardápio de hoje vem do Telegram. Dá pra colar aqui pra todo mundo ver.';
+    const btn = document.createElement('button');
+    btn.className = 'primary';
+    btn.textContent = 'Adicionar cardápio';
+    btn.onclick = () => openMenuModal(nowMeal());
+    card.append(title, sub, btn);
+    container.appendChild(card);
+    return;
+  }
+
+  const day = menus[0].date;
+  const dayMenus = menus.filter((m) => m.date === day);
+  const almoço = dayMenus.find((m) => m.meal === 'almoço');
+  const jantar = dayMenus.find((m) => m.meal === 'jantar');
+  if (!state.menuTab || !dayMenus.some((m) => m.meal === state.menuTab)) {
+    state.menuTab = jantar ? 'jantar' : 'almoço';
+  }
+  const current = state.menuTab === 'jantar' ? jantar : almoço;
+
+  const card = document.createElement('div');
+  card.className = 'card menu';
+
+  const head = document.createElement('div');
+  head.className = 'menu-head';
+  const titles = document.createElement('div');
+  const title = document.createElement('div');
+  title.className = 'menu-title';
+  title.textContent = '🍽️ Cardápio';
+  const date = document.createElement('div');
+  date.className = 'menu-date';
+  const any = almoço || jantar;
+  date.textContent = any ? any.dateLabel : day;
+  titles.append(title, date);
+  const editBtn = document.createElement('button');
+  editBtn.className = 'menu-edit';
+  editBtn.textContent = '✏️';
+  editBtn.title = 'Editar cardápio';
+  editBtn.onclick = () => openMenuModal(current ? current.meal : null);
+  head.append(titles, editBtn);
+  card.appendChild(head);
+
+  const tabs = document.createElement('div');
+  tabs.className = 'tabs';
+  const mkTab = (meal, label, has) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (state.menuTab === meal ? ' active' : '');
+    b.textContent = has ? label : `${label} —`;
+    b.onclick = () => { state.menuTab = meal; renderMenu(); };
+    return b;
+  };
+  tabs.append(mkTab('almoço', 'Almoço', !!almoço), mkTab('jantar', 'Jantar', !!jantar));
+  card.appendChild(tabs);
+
+  if (current) {
+    const ul = document.createElement('ul');
+    ul.className = 'menu-items';
+    for (const it of current.items) {
+      const li = document.createElement('li');
+      li.textContent = it.text;
+      tagify(li, it);
+      ul.appendChild(li);
+    }
+    card.appendChild(ul);
+  } else {
+    const p = document.createElement('p');
+    p.className = 'sub';
+    p.textContent = 'Ainda não tem cardápio desse horário.';
+    card.appendChild(p);
+  }
+
+  container.appendChild(card);
 }
 
 function initEmail() {

@@ -403,3 +403,121 @@ input[type="time"] { margin-top: 4px; }
   .sheet { border-radius: 28px; margin: auto 0 8vh; animation: sheet-up .3s cubic-bezier(.22, 1, .36, 1); }
   .body-overlay { overflow: hidden; }
 }
+
+.card.menu {
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.menu-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.menu-title {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.menu-date {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.menu-edit {
+  border: none;
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.menu-edit:active { transform: scale(.96); }
+
+.menu .tabs { margin-bottom: 12px; }
+
+.menu-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu-items li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 9px 0;
+  font-size: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+.menu-items li:first-child { border-top: none; }
+
+.tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: .03em;
+}
+
+.tag.veg { background: var(--soft); color: var(--green-deep); }
+.tag.lac { background: #f6e3d4; color: var(--red); }
+
+.empty-menu { text-align: center; padding: 22px; }
+.empty-menu .menu-title { margin-bottom: 6px; }
+.empty-menu .sub { margin: 4px 0 14px; }
+
+textarea {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 14.5px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  margin-top: 6px;
+}
+
+textarea:focus { border-color: var(--green); }
+
+select.meal-select {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+  outline: none;
+  margin-top: 10px;
+}
+
+.ghost.wide { width: 100%; margin-top: 10px; }
+
+.menu-preview {
+  margin-top: 12px;
+  background: var(--soft);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.fv {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--green-deep);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}

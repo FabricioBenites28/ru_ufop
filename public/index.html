@@ -11,7 +11,7 @@
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>RU UFOP</title>
-  <link rel="stylesheet" href="/style.css?v=2">
+  <link rel="stylesheet" href="/style.css?v=3">
 </head>
 <body>
   <header>
@@ -26,6 +26,7 @@
   </header>
 
   <main>
+    <section id="menuSection"></section>
     <section id="timeline"></section>
     <div id="empty" class="empty hidden">
       <div class="empty-emoji">🍃</div>
@@ -73,8 +74,27 @@
     </div>
   </div>
 
+  <div id="menuModal" class="overlay">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2>🍽️ Cardápio do dia</h2>
+      <p class="sub">Cole aqui o cardápio que soltam no Telegram. Ele fica visível para todo o grupo.</p>
+      <textarea id="menuText" rows="8" placeholder="🍴Cardápio do Almoço - Dia 17/09/2026 (Quinta-feira)🍴&#10;&#10;- Frango grelhado napolitano*&#10;- Arroz branco&#10;- Feijão&#10;- Vegetariano: abobrinha com soja ao molho*&#10;&#10;*Contém LACTOSE"></textarea>
+      <select id="mealSelect">
+        <option value="almoço">Almoço</option>
+        <option value="jantar">Jantar</option>
+      </select>
+      <button id="detectBtn" class="ghost wide">Detectar cardápio</button>
+      <div id="menuPreview" class="menu-preview hidden"></div>
+      <div class="actions">
+        <button id="menuCancel" class="ghost">Cancelar</button>
+        <button id="menuSave" class="primary">Salvar cardápio</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/app.js?v=2"></script>
+  <script src="/app.js?v=3"></script>
 </body>
 </html>
