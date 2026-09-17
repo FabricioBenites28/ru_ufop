@@ -97,30 +97,26 @@ function sendPush(title, body) {
   });
 }
 
-function fmtTime(date) {
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const EMAIL_RE = /^[a-z0-9._%+\-]+@(?:aluno\.)?ufop\.edu\.br$/i;
+
+function nameFromEmail(email) {
+  const local = email.split('@')[0].replace(/[._]+/g, ' ').trim();
+  return local
+    .split(' ')
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(' ');
 }
 
 function arrivalInfo(body) {
-  const now = Date.now();
-  if (body.when === 'in') {
-    const minutes = Math.min(Math.max(parseInt(body.minutes, 10) || 30, 1), 1440);
-    return {
-      arrive: new Date(now + minutes * 60000),
-      inMinutes: minutes,
-      exact: false,
-      label: `em ${minutes} min`,
-    };
-  }
-  const parts = String(body.time || '12:00').split(':').map(Number);
-  const date = new Date();
-  date.setHours(parts[0] || 12, parts[1] || 0, 0, 0);
-  if (date.getTime() < now) date.setDate(date.getDate() + 1);
+  const arrive = new Date(body.arrive);
+  if (isNaN(arrive.getTime())) return null;
+  const minutes = Math.max(1, Math.round((arrive.getTime() - Date.now()) / 60000));
+  const label = String(body.label || '').trim().slice(0, 40);
   return {
-    arrive: date,
-    inMinutes: Math.round((date.getTime() - now) / 60000),
-    exact: true,
-    label: `às ${fmtTime(date)}`,
+    arrive,
+    inMinutes: minutes,
+    exact: body.when !== 'in',
+    label: label || `em ${minutes} min`,
   };
 }
 
@@ -131,19 +127,22 @@ app.get('/api/announcements', (req, res) => {
 });
 
 app.post('/api/announce', async (req, res) => {
-  const name = String(req.body.name || '').trim().slice(0, 40);
-  if (!name) return res.status(400).json({ error: 'nome obrigatório' });
-  const userId = String(req.body.userId || '');
+  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 80);
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'e-mail UFOP inválido' });
   const info = arrivalInfo(req.body);
+  if (!info) return res.status(400).json({ error: 'horário inválido' });
+  const userId = String(req.body.userId || '');
   const now = Date.now();
   db.announcements = db.announcements.filter(
     (a) =>
       new Date(a.arrive).getTime() > now - MAX_AGE &&
       (a.userId !== userId || new Date(a.arrive).getTime() <= now)
   );
+  const name = nameFromEmail(email);
   const announcement = {
     id: crypto.randomUUID(),
     userId,
+    email,
     name,
     announceAt: new Date().toISOString(),
     arrive: info.arrive.toISOString(),
@@ -153,10 +152,7 @@ app.post('/api/announce', async (req, res) => {
   };
   db.announcements.push(announcement);
   await save();
-  const body = info.exact
-    ? `Vai comer no RU ${info.label} (${fmtTime(info.arrive)})`
-    : `Vai comer no RU ${info.label}`;
-  sendPush(name, body);
+  sendPush(name, `Vai comer no RU ${info.label}`);
   res.json(announcement);
 });
 

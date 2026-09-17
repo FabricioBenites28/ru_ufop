@@ -2,9 +2,10 @@ const $ = (s) => document.querySelector(s);
 
 const MODAL_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120];
 const DAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const EMAIL_RE = /^[a-z0-9._%+\-]+@(?:aluno\.)?ufop\.edu\.br$/i;
 
 const state = {
-  name: localStorage.getItem('ru_name') || '',
+  email: localStorage.getItem('ru_email') || '',
   userId: localStorage.getItem('ru_userId') || crypto.randomUUID(),
   mode: 'in',
   minutes: 30,
@@ -12,6 +13,14 @@ const state = {
 };
 
 localStorage.setItem('ru_userId', state.userId);
+
+function nameFromEmail(email) {
+  const local = email.split('@')[0].replace(/[._]+/g, ' ').trim();
+  return local
+    .split(' ')
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
 
 function fmtClock(iso) {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -145,6 +154,19 @@ function buildChips() {
   }
 }
 
+function arrival() {
+  const now = Date.now();
+  if (state.mode === 'in') {
+    const arrive = new Date(now + state.minutes * 60000);
+    return { when: 'in', arrive: arrive.toISOString(), label: `em ${state.minutes} min` };
+  }
+  const [h, m] = state.exact.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h || 0, m || 0, 0, 0);
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+  return { when: 'exact', arrive: d.toISOString(), label: `às ${state.exact}` };
+}
+
 function syncModal() {
   $('#tabIn').classList.toggle('active', state.mode === 'in');
   $('#tabExact').classList.toggle('active', state.mode === 'exact');
@@ -153,41 +175,32 @@ function syncModal() {
   for (const chip of $('#chips').children) {
     chip.classList.toggle('selected', state.mode === 'in' && state.minutes === parseInt(chip.dataset.m, 10));
   }
-  const preview = $('#preview');
-  if (state.mode === 'in') {
-    preview.textContent = `Você vai comer no RU em ${state.minutes} min`;
-  } else {
-    preview.textContent = `Você vai comer no RU às ${state.exact}`;
-  }
+  $('#preview').textContent = `Você vai comer no RU ${arrival().label}`;
 }
 
 function openModal() {
+  syncModal();
   $('#modal').classList.remove('hidden');
-  $('#announceBtn').style.display = 'none';
+  document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
   $('#modal').classList.add('hidden');
-  $('#announceBtn').style.display = '';
+  document.body.style.overflow = '';
 }
 
 async function confirmAnnounce() {
-  const payload = { name: state.name, userId: state.userId };
-  if (state.mode === 'in') {
-    payload.when = 'in';
-    payload.minutes = state.minutes;
-  } else {
-    payload.when = 'exact';
-    payload.time = state.exact;
-  }
+  const r = arrival();
+  const payload = { email: state.email, userId: state.userId, when: r.when, arrive: r.arrive, label: r.label };
   $('#confirmBtn').textContent = 'Enviando…';
   $('#confirmBtn').disabled = true;
   try {
-    await fetch('/api/announce', {
+    const resp = await fetch('/api/announce', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (!resp.ok) throw new Error('invalid');
     closeModal();
     toast('Aviso enviado! 🔔');
     renderTimeline();
@@ -209,29 +222,42 @@ function start() {
   $('#confirmBtn').addEventListener('click', confirmAnnounce);
   $('#exactTime').addEventListener('change', (e) => { state.exact = e.target.value; syncModal(); });
 
-  $('#nameOk').addEventListener('click', () => {
-    const name = $('#nameInput').value.trim();
-    if (!name) return;
-    state.name = name;
-    localStorage.setItem('ru_name', name);
-    $('#nameOverlay').classList.add('hidden');
-    renderTimeline();
-    enablePush();
-  });
-
   setInterval(renderTimeline, 30000);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) renderTimeline();
   });
   renderTimeline();
+  enablePush();
 }
 
-if (state.name) {
+function initEmail() {
+  const input = $('#emailInput');
+  const error = $('#emailError');
+  const ok = () => {
+    const email = input.value.trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) {
+      error.classList.remove('hidden');
+      return;
+    }
+    error.classList.add('hidden');
+    state.email = email;
+    localStorage.setItem('ru_email', email);
+    $('#emailOverlay').classList.add('hidden');
+    const name = nameFromEmail(email);
+    $('.brand-sub').textContent = `oi, ${name.split(' ')[0]} 👋`;
+    start();
+  };
+  $('#emailOk').addEventListener('click', ok);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') ok();
+  });
+  input.focus();
+}
+
+if (state.email) {
+  $('.brand-sub').textContent = `oi, ${nameFromEmail(state.email).split(' ')[0]} 👋`;
   start();
 } else {
-  $('#nameOverlay').classList.remove('hidden');
-  $('#nameInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') $('#nameOk').click();
-  });
-  start();
+  $('#emailOverlay').classList.remove('hidden');
+  initEmail();
 }

@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#f6f1e7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -12,32 +14,42 @@
 </head>
 <body>
   <header>
-    <div class="brand"><span>🍽️</span> RU UFOP</div>
-    <span id="status" class="badge">conectando…</span>
+    <div class="brand">
+      <span class="logo">🍽️</span>
+      <div>
+        <div class="brand-name">RU UFOP</div>
+        <div class="brand-sub">quem vai comer?</div>
+      </div>
+    </div>
+    <span id="status" class="badge">…</span>
   </header>
 
   <main>
     <section id="timeline"></section>
     <div id="empty" class="empty hidden">
+      <div class="empty-emoji">🍃</div>
       <p>Ninguém anunciou ainda.</p>
-      <p class="sub">Seja o primeiro a avisar que vai ao RU!</p>
+      <p class="sub">Seja a primeira pessoa a avisar que vai ao RU!</p>
     </div>
   </main>
 
   <button id="announceBtn" class="fab">➕ Anunciar</button>
 
-  <div id="nameOverlay" class="overlay">
-    <div class="card">
-      <h1>🍽️ Bem-vindo ao RU</h1>
-      <p class="sub">Como você se chama? Isso aparecerá nos avisos.</p>
-      <input id="nameInput" placeholder="Seu nome" autocomplete="off" maxlength="40">
-      <button id="nameOk" class="primary">Começar</button>
+  <div id="emailOverlay" class="overlay center">
+    <div class="card auth">
+      <div class="auth-icon">🍽️</div>
+      <h1>Bem-vindo ao RU</h1>
+      <p class="sub">Entre com seu e-mail da UFOP.<br>Assim todos sabem quem vai comer.</p>
+      <input id="emailInput" type="email" placeholder="nome@aluno.ufop.edu.br" autocomplete="email" autocapitalize="off" spellcheck="false">
+      <div id="emailError" class="error hidden">Digite um e-mail válido da UFOP<br>(…@aluno.ufop.edu.br)</div>
+      <button id="emailOk" class="primary">Continuar</button>
     </div>
   </div>
 
-  <div id="modal" class="overlay hidden">
-    <div class="card">
-      <h2 id="modalTitle">Vou comer no RU…</h2>
+  <div id="modal" class="overlay">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2>Vou comer no RU…</h2>
       <div class="tabs">
         <button id="tabIn" class="tab active">Em quanto tempo?</button>
         <button id="tabExact" class="tab">Hora exata</button>
@@ -51,7 +63,7 @@
         <input type="time" id="exactTime" value="19:00">
       </div>
 
-      <div class="preview" id="preview">Você vai comer no RU em 30 min</div>
+      <div class="preview" id="preview"></div>
 
       <div class="actions">
         <button id="cancelBtn" class="ghost">Cancelar</button>
