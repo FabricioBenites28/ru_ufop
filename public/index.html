@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <title>RU UFOP</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span>🍽️</span> RU UFOP</div>
+    <span id="status" class="badge">conectando…</span>
+  </header>
+
+  <main>
+    <section id="timeline"></section>
+    <div id="empty" class="empty hidden">
+      <p>Ninguém anunciou ainda.</p>
+      <p class="sub">Seja o primeiro a avisar que vai ao RU!</p>
+    </div>
+  </main>
+
+  <button id="announceBtn" class="fab">➕ Anunciar</button>
+
+  <div id="nameOverlay" class="overlay">
+    <div class="card">
+      <h1>🍽️ Bem-vindo ao RU</h1>
+      <p class="sub">Como você se chama? Isso aparecerá nos avisos.</p>
+      <input id="nameInput" placeholder="Seu nome" autocomplete="off" maxlength="40">
+      <button id="nameOk" class="primary">Começar</button>
+    </div>
+  </div>
+
+  <div id="modal" class="overlay hidden">
+    <div class="card">
+      <h2 id="modalTitle">Vou comer no RU…</h2>
+      <div class="tabs">
+        <button id="tabIn" class="tab active">Em quanto tempo?</button>
+        <button id="tabExact" class="tab">Hora exata</button>
+      </div>
+
+      <div id="panelIn" class="panel">
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div id="panelExact" class="panel hidden">
+        <input type="time" id="exactTime" value="19:00">
+      </div>
+
+      <div class="preview" id="preview">Você vai comer no RU em 30 min</div>
+
+      <div class="actions">
+        <button id="cancelBtn" class="ghost">Cancelar</button>
+        <button id="confirmBtn" class="primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
