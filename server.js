@@ -8,26 +8,60 @@ const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
 const VAPID_FILE = path.join(__dirname, '.vapid.json');
 const MAX_AGE = 24 * 60 * 60 * 1000;
+const REDIS_KEY = 'ru:data';
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-function loadData() {
+let redis = null;
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  const { Redis } = require('@upstash/redis');
+  redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+}
+
+let db = { announcements: [], subscriptions: [] };
+
+async function loadData() {
+  if (redis) {
+    try {
+      const data = await redis.get(REDIS_KEY);
+      if (data) db = typeof data === 'string' ? JSON.parse(data) : data;
+    } catch (err) {
+      console.error('erro ao ler do Redis:', err.message);
+    }
+    return;
+  }
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   } catch {
-    return { announcements: [], subscriptions: [] };
+    db = { announcements: [], subscriptions: [] };
   }
 }
 
-let db = loadData();
-
-function save() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(db));
+async function save() {
+  try {
+    if (redis) {
+      await redis.set(REDIS_KEY, db);
+    } else {
+      fs.writeFileSync(DATA_FILE, JSON.stringify(db));
+    }
+  } catch (err) {
+    console.error('erro ao salvar:', err.message);
+  }
 }
 
 function loadVapid() {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    return {
+      subject: process.env.VAPID_SUBJECT || 'mailto:ru@ufop.local',
+      publicKey: process.env.VAPID_PUBLIC_KEY,
+      privateKey: process.env.VAPID_PRIVATE_KEY,
+    };
+  }
   try {
     return JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8'));
   } catch {
@@ -55,10 +89,10 @@ function sendPush(title, body) {
         if (err.statusCode === 404 || err.statusCode === 410) dead.push(sub);
       })
   );
-  Promise.all(jobs).then(() => {
+  Promise.all(jobs).then(async () => {
     if (dead.length) {
       db.subscriptions = db.subscriptions.filter((s) => !dead.includes(s));
-      save();
+      await save();
     }
   });
 }
@@ -96,15 +130,16 @@ app.get('/api/announcements', (req, res) => {
   res.json(list);
 });
 
-app.post('/api/announce', (req, res) => {
+app.post('/api/announce', async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 40);
   if (!name) return res.status(400).json({ error: 'nome obrigatório' });
   const userId = String(req.body.userId || '');
   const info = arrivalInfo(req.body);
+  const now = Date.now();
   db.announcements = db.announcements.filter(
     (a) =>
-      a.userId !== userId ||
-      new Date(a.arrive).getTime() <= Date.now()
+      new Date(a.arrive).getTime() > now - MAX_AGE &&
+      (a.userId !== userId || new Date(a.arrive).getTime() <= now)
   );
   const announcement = {
     id: crypto.randomUUID(),
@@ -117,21 +152,20 @@ app.post('/api/announce', (req, res) => {
     label: info.label,
   };
   db.announcements.push(announcement);
-  save();
-  const title = name;
+  await save();
   const body = info.exact
     ? `Vai comer no RU ${info.label} (${fmtTime(info.arrive)})`
     : `Vai comer no RU ${info.label}`;
-  sendPush(title, body);
+  sendPush(name, body);
   res.json(announcement);
 });
 
-app.post('/api/subscribe', (req, res) => {
+app.post('/api/subscribe', async (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'assinatura inválida' });
   if (!db.subscriptions.some((s) => s.endpoint === sub.endpoint)) {
     db.subscriptions.push(sub);
-    save();
+    await save();
   }
   res.json({ ok: true });
 });
@@ -140,6 +174,9 @@ app.get('/api/vapid', (req, res) => {
   res.json({ publicKey: vapid.publicKey });
 });
 
-app.listen(PORT, () => {
-  console.log(`RU UFOP rodando em http://localhost:${PORT}`);
+loadData().then(() => {
+  app.listen(PORT, () => {
+    console.log(`RU UFOP rodando na porta ${PORT}`);
+    if (redis) console.log('persistência: Upstash Redis');
+  });
 });

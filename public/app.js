@@ -41,15 +41,20 @@ async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
+    const { publicKey } = await (await fetch('/api/vapid')).json();
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') return;
     let sub = await reg.pushManager.getSubscription();
+    if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
+      await sub.unsubscribe();
+      sub = null;
+    }
     if (!sub) {
-      const { publicKey } = await (await fetch('/api/vapid')).json();
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
+      localStorage.setItem('ru_vapid', publicKey);
     }
     if (sub) {
       await fetch('/api/subscribe', {
@@ -59,7 +64,7 @@ async function enablePush() {
       });
     }
   } catch (err) {
-    console.error('push fallhou:', err);
+    console.error('push falhou:', err);
   }
 }
 
