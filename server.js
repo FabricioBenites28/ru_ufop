@@ -11,8 +11,17 @@ const MAX_AGE = 24 * 60 * 60 * 1000;
 const REDIS_KEY = 'ru:data';
 
 const app = express();
+const PUBLIC = path.join(__dirname, 'public');
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+const noCache = (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  next();
+};
+app.get('/', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
+app.get('/index.html', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
+app.get('/sw.js', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'sw.js')));
+app.get('/manifest.json', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'manifest.json')));
+app.use(express.static(PUBLIC));
 
 let redis = null;
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
