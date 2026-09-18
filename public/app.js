@@ -310,9 +310,12 @@ function start() {
   $('#confirmBtn').addEventListener('click', confirmAnnounce);
   $('#exactTime').addEventListener('change', (e) => { state.exact = e.target.value; syncModal(); });
 
-  $('#mealSelect').addEventListener('change', refreshMenuPreview);
-  $('#menuText').addEventListener('input', refreshMenuPreview);
   $('#menuCancel').addEventListener('click', closeMenuModal);
+  $('#menuNext').addEventListener('click', menuNext);
+  $('#mealAlmoco').addEventListener('click', () => chooseMeal('almoço'));
+  $('#mealJantar').addEventListener('click', () => chooseMeal('jantar'));
+  $('#mealBack').addEventListener('click', () => goMenuStep(0));
+  $('#previewBack').addEventListener('click', () => goMenuStep(0));
   $('#menuSave').addEventListener('click', saveMenu);
   $('#logoutBtn').addEventListener('click', logout);
 
@@ -390,10 +393,20 @@ function tagify(li, item) {
   }
 }
 
+const MENU_STEPS = ['stepPaste', 'stepMeal', 'stepPreview'];
+
+function goMenuStep(n) {
+  for (let i = 0; i < MENU_STEPS.length; i++) {
+    $(`#${MENU_STEPS[i]}`).classList.toggle('hidden', i !== n);
+  }
+  const sheet = $('#menuModal .sheet');
+  if (sheet) sheet.scrollTop = 0;
+}
+
 function openMenuModal() {
   $('#menuText').value = '';
-  $('#menuPreview').classList.add('hidden');
   state.pendingMenu = null;
+  goMenuStep(0);
   $('#menuModal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   $('#menuText').focus();
@@ -401,21 +414,29 @@ function openMenuModal() {
 
 function closeMenuModal() {
   $('#menuModal').classList.add('hidden');
-  $('#menuPreview').classList.add('hidden');
   document.body.style.overflow = '';
 }
 
-function refreshMenuPreview() {
+function menuNext() {
   const p = parseMenuText($('#menuText').value);
-  p.meal = $('#mealSelect').value;
-  const prev = $('#menuPreview');
   if (!p.items.length) {
-    prev.classList.add('hidden');
-    state.pendingMenu = null;
+    toast('Cole o cardápio primeiro.');
     return;
   }
   state.pendingMenu = p;
-  prev.classList.remove('hidden');
+  goMenuStep(1);
+}
+
+function chooseMeal(meal) {
+  state.pendingMenu.meal = meal;
+  goMenuStep(2);
+  renderMenuPreview();
+}
+
+function renderMenuPreview() {
+  const p = state.pendingMenu;
+  if (!p) return;
+  const prev = $('#menuPreview');
   prev.innerHTML = '';
   const head = document.createElement('div');
   head.className = 'fv';
@@ -435,8 +456,8 @@ function refreshMenuPreview() {
 
 async function saveMenu() {
   const p = state.pendingMenu;
-  if (!p) return;
-  $('#menuSave').textContent = 'Salvando…';
+  if (!p || !p.meal) return;
+  $('#menuSave').textContent = 'Publicando…';
   $('#menuSave').disabled = true;
   try {
     const resp = await fetch('/api/menu', {
@@ -452,12 +473,12 @@ async function saveMenu() {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
     closeMenuModal();
-    toast('Cardápio salvo! 🍽️');
+    toast('Cardápio publicado! 🍽️');
     renderMenu();
   } catch {
-    toast('Falha ao salvar. Tente de novo.');
+    toast('Falha ao publicar. Tente de novo.');
   }
-  $('#menuSave').textContent = 'Salvar';
+  $('#menuSave').textContent = 'Publicar';
   $('#menuSave').disabled = false;
 }
 

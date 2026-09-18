@@ -96,18 +96,36 @@
   <div id="menuModal" class="overlay center hidden">
     <div class="sheet">
       <div class="sheet-grab"></div>
-      <h2>🍽️ Cardápio do dia</h2>
-      <p class="sub">Cada linha é um item. Os que tiverem * viram aviso (ex.: alergias, vegano).</p>
-      <textarea id="menuText" rows="9" placeholder="🍽️Cardápio do Jantar - Dia 17/09/2026 (Quinta-feira)🍽️&#10;&#10;- Cubos de lombo ao molho escuro&#10;- Arroz branco&#10;- Arroz integral&#10;- Feijão&#10;- Sopa de moranga&#10;- Repolho, tomate e pepino&#10;- Maçã&#10;- Vegetariano: hambúrguer de lentilha*&#10;- *Contém OVO e GLÚTEN"></textarea>
-      <select id="mealSelect">
-        <option value="almoço">Almoço</option>
-        <option value="jantar">Jantar</option>
-      </select>
-      <div id="menuPreview" class="menu-preview hidden"></div>
-      <div class="actions">
-        <button id="menuCancel" class="ghost">Cancelar</button>
-        <button id="menuSave" class="primary">Salvar cardápio</button>
+
+      <div id="stepPaste">
+        <h2>🍽️ Cardápio do dia</h2>
+        <p class="sub">Cole o cardápio. Cada linha é um item; os que tiverem * viram aviso.</p>
+        <textarea id="menuText" rows="8" placeholder="🍽️Cardápio do Jantar - Dia 17/09/2026 (Quinta-feira)🍽️&#10;&#10;- Cubos de lombo ao molho escuro&#10;- Arroz branco&#10;- Arroz integral&#10;- Feijão&#10;- Sopa de moranga&#10;- Repolho, tomate e pepino&#10;- Maçã&#10;- Vegetariano: hambúrguer de lentilha*&#10;- *Contém OVO e GLÚTEN"></textarea>
+        <div class="actions">
+          <button id="menuCancel" class="ghost">Cancelar</button>
+          <button id="menuNext" class="primary">Continuar</button>
+        </div>
       </div>
+
+      <div id="stepMeal" class="hidden">
+        <h2>Qual refeição?</h2>
+        <p class="sub">Escolha para qual horário é esse cardápio.</p>
+        <button id="mealAlmoco" class="meal-option">🍚 Almoço</button>
+        <button id="mealJantar" class="meal-option">🌙 Jantar</button>
+        <div class="actions">
+          <button id="mealBack" class="ghost">Voltar</button>
+        </div>
+      </div>
+
+      <div id="stepPreview" class="hidden">
+        <h2>Prévia do cardápio</h2>
+        <div id="menuPreview" class="menu-preview"></div>
+        <div class="actions">
+          <button id="previewBack" class="ghost">Editar</button>
+          <button id="menuSave" class="primary">Publicar</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
