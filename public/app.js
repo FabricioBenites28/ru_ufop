@@ -1,14 +1,15 @@
 const $ = (s) => document.querySelector(s);
 
 const MODAL_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120];
-const DAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-const WEEKDAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+const DAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const MENU_EDITOR_EMAIL = 'carlos.rodriguez@aluno.ufop.edu.br';
-
 const state = {
   session: localStorage.getItem('ru_session') || '',
   name: localStorage.getItem('ru_name') || '',
   email: localStorage.getItem('ru_email') || '',
+  photo: localStorage.getItem('ru_photo') || '',
+  course: localStorage.getItem('ru_course') || '',
+  started: false,
   mode: 'in',
   minutes: 30,
   exact: '19:00',
@@ -18,16 +19,49 @@ const state = {
 
 const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
 
-function authHeaders(extra = {}) {
-  const headers = { 'Content-Type': 'application/json', ...extra };
+const COURSES = [
+  'Ciência da Computação', 'Engenharia de Computação', 'Engenharia de Software',
+  'Sistemas de Informação', 'Engenharia de Controle e Automação',
+  'Engenharia Civil', 'Engenharia de Minas', 'Engenharia Mecânica', 'Engenharia de Produção',
+  'Engenharia Elétrica', 'Engenharia de Computação', 'Engenharia de Telecomunicações',
+  'Arquitetura e Urbanismo', 'Design de Produto', 'Farmácia', 'Medicina', 'Enfermagem',
+  'Nutrição', 'Educação Física', 'Odontologia', 'Direito', 'Economia',
+  'Administração', 'Ciências Contábeis', 'Jornalismo', 'Letras', 'História',
+  'Filosofia', 'Geografia', 'Pedagogia', 'Psicologia', 'Ciências Biológicas',
+  'Física', 'Química', 'Matemática', 'Estatística', 'Música', 'Turismo',
+  'Serviço Social', 'Outro curso',
+];
+const COURSE_OPTIONS = COURSES.map((c) => `<option value="${c}"></option>`).join('');
+const COURSE_OPTION_ITEMS = COURSES.map((c) => `${c}`).join('|');
+
+function authHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
   if (state.session) headers.Authorization = 'Bearer ' + state.session;
   return headers;
+}
+
+function applyProfile(p) {
+  state.name = p.name || state.name;
+  state.email = p.email || state.email;
+  state.photo = p.photo || '';
+  state.course = p.course || '';
+  localStorage.setItem('ru_name', state.name);
+  localStorage.setItem('ru_email', state.email);
+  localStorage.setItem('ru_photo', state.photo);
+  localStorage.setItem('ru_course', state.course);
+  $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
+}
+
+function setGreeting() {
+  $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
 }
 
 function logout() {
   localStorage.removeItem('ru_session');
   localStorage.removeItem('ru_name');
   localStorage.removeItem('ru_email');
+  localStorage.removeItem('ru_photo');
+  localStorage.removeItem('ru_course');
   location.reload();
 }
 
@@ -125,7 +159,15 @@ async function renderTimeline() {
 
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
-    avatar.textContent = a.name.trim().charAt(0).toUpperCase();
+    if (a.photo) {
+      const img = document.createElement('img');
+      img.src = a.photo;
+      img.alt = a.name;
+      img.referrerPolicy = 'no-referrer';
+      avatar.appendChild(img);
+    } else {
+      avatar.textContent = a.name.trim().charAt(0).toUpperCase();
+    }
 
     const info = document.createElement('div');
     info.className = 'info';
@@ -136,6 +178,12 @@ async function renderTimeline() {
     when.className = 'when';
     when.textContent = `Vai comer no RU ${a.label}`;
     info.append(name, when);
+    if (a.course) {
+      const course = document.createElement('div');
+      course.className = 'course';
+      course.textContent = a.course;
+      info.appendChild(course);
+    }
 
     const clock = document.createElement('div');
     clock.className = 'clock';
@@ -222,6 +270,9 @@ async function confirmAnnounce() {
 }
 
 function start() {
+  if (state.started) return;
+  state.started = true;
+
   buildChips();
   syncModal();
 
@@ -237,7 +288,7 @@ function start() {
   $('#menuText').addEventListener('input', refreshMenuPreview);
   $('#menuCancel').addEventListener('click', closeMenuModal);
   $('#menuSave').addEventListener('click', saveMenu);
-  $('#logoutBtn').addEventListener('click', logout);
+  $('#logoutBtn').addEventListener('click', logoutoddTrash);
 
   setInterval(renderTimeline, 30000);
   document.addEventListener('visibilitychange', () => {
@@ -265,13 +316,13 @@ function parseMenuText(raw) {
   if (mm) meal = mm[1].toLowerCase().includes('jantar') ? 'jantar' : 'almoço';
   let date = todayStr();
   let dateLabel = '';
-  const dm = text.match(/dia\s+(\d{1,2})\s*[/\-]\s*(\d{1,2})\s*[/\-]\s*(\d{4})/i);
+  const dm = text.match(/dia\s+(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})/i);
   if (dm) {
     const d = Number(dm[1]);
     const m = Number(dm[2]);
     const y = Number(dm[3]);
     date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    dateLabel = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`;
+    dateLabel = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${DAYS[new Date(y, m - 1, d).getDay()]})`;
   }
   const items = [];
   for (const line of lines) {
@@ -303,8 +354,7 @@ function tagify(li, item) {
   }
 }
 
-function openMenuModal(meal) {
-  if (meal) $('#mealSelect').value = meal;
+function openMenuModal() {
   $('#menuText').value = '';
   $('#menuPreview').classList.add('hidden');
   state.pendingMenu = null;
@@ -366,13 +416,12 @@ async function saveMenu() {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
     closeMenuModal();
-    state.menuTab = p.meal;
     toast('Cardápio salvo! 🍽️');
     renderMenu();
   } catch {
     toast('Falha ao salvar. Tente de novo.');
   }
-  $('#menuSave').textContent = 'Salvar cardápio';
+  $('#menuSave').textContent = 'Salvar';
   $('#menuSave').disabled = false;
 }
 
@@ -389,7 +438,7 @@ async function renderMenu() {
 
   if (!menus.length) {
     const card = document.createElement('div');
-    card.className = 'card menu empty-menu';
+    card.className = 'card menu';
     const title = document.createElement('div');
     title.className = 'menu-title';
     title.textContent = '🍽️ Cardápio';
@@ -401,7 +450,7 @@ async function renderMenu() {
       const btn = document.createElement('button');
       btn.className = 'primary';
       btn.textContent = 'Adicionar cardápio';
-      btn.onclick = () => openMenuModal(nowMeal());
+      btn.onclick = () => openMenuModal();
       card.appendChild(btn);
     }
     container.appendChild(card);
@@ -436,7 +485,7 @@ async function renderMenu() {
     editBtn.className = 'menu-edit';
     editBtn.textContent = '✏️';
     editBtn.title = 'Editar cardápio';
-    editBtn.onclick = () => openMenuModal(current ? current.meal : null);
+    editBtn.onclick = () => openMenuModal();
     head.append(titles, editBtn);
   } else {
     head.appendChild(titles);
@@ -525,24 +574,109 @@ async function handleCredential(response) {
     if (!resp.ok) throw new Error('invalid');
     const data = await resp.json();
     state.session = data.token;
-    state.name = data.name;
-    state.email = data.email;
     localStorage.setItem('ru_session', data.token);
-    localStorage.setItem('ru_name', data.name);
-    localStorage.setItem('ru_email', data.email);
-    $('.brand-sub').textContent = `oi, ${data.name.split(' ')[0]} 👋`;
+    applyProfile({ name: data.name, email: data.email, photo: data.photo, course: data.course });
     $('#emailOverlay').classList.add('hidden');
-    start();
+    if (data.needsCourse) {
+      openCourseSheet(true);
+    } else {
+      start();
+    }
   } catch {
     $('#authError').textContent = 'Falha ao entrar. Tente de novo.';
     $('#authError').classList.remove('hidden');
   }
 }
 
-if (state.session) {
-  $('.brand-sub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
-  start();
-} else {
-  $('#emailOverlay').classList.remove('hidden');
-  initGoogle();
+async function bootstrap() {
+  try {
+    const resp = await fetch('/api/me', { headers: authHeaders() });
+    if (resp.status === 401) return logout();
+    if (!resp.ok) return start();
+    const p = await resp.json();
+    applyProfile(p);
+    if (!p.course) return openCourseSheet(true);
+    start();
+  } catch {
+    start();
+  }
+}
+
+function fillCourseDatalist() {
+  const el = $('#courseOptions');
+  el.innerHTML = COURSE_OPTIONS;
+}
+
+function openCourseSheet(required) {
+  const ov = $('#courseOverlay');
+  const photo = $('#coursePhoto');
+  if (state.photo) {
+    photo.src = state.photo;
+    photo.classList.remove('hidden');
+    $('#coursePhotoFbk').classList.add('hidden');
+    $('#courseFill' )
+  } else {
+    photo.classList.add('hidden');
+    $('#coursePhotoFbk').classList.remove('hidden');
+  }
+  $('#courseName').textContent = state.name;
+  $('#courseMsg').textContent = required
+    ? 'Conta pra gente seu curso pra confirmar. 🎓'
+    : 'Atualize seu curso quando quiser.';
+  $('#courseInput').value = state.course;
+  $('#courseInput').setAttribute('list', 'courseOptions');
+  $('#courseError').classList.add('hidden');
+  ov.classList.remove('hidden');
+  $('#courseInput').focus();
+}
+
+function closeCourseSheet() {
+  $('#courseOverlay').classList.add('hidden');
+  if (!state.started) start();
+}
+
+async function saveCourse() {
+  const course = $('#courseInput').value.trim();
+  if (!course) {
+    $('#courseError').textContent = 'Informe seu curso para continuar.';
+    $('#courseError').classList.remove('hidden');
+    return;
+  }
+  $('#courseError').classList.add('hidden');
+  $('#courseSave').disabled = true;
+  $('#courseSave').textContent = 'Salvando…';
+  try {
+    const resp = await fetch('/api/me', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ course }),
+    });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) throw new Error('invalid');
+    const p = await resp.json();
+    applyProfile(p);
+    closeCourseSheet();
+    toast('Perfil atualizado! 🎓');
+  } catch {
+    toast('Falha ao salvar. Tente de novo.');
+  }
+  $('#courseSave').textContent = 'Salvar';
+  $('#courseSave').disabled = false;
+}
+
+$('#courseCancel').addEventListener('click', closeCourseSheet);
+$('#courseSave').addEventListener('click', saveCourse);
+
+wireCourseOverlay();
+fillCourseDatalist();
+start();
+
+function wireCourseOverlay() {
+  $('#courseCancel').addEventListener('click', closeCourseSheet);
+  $('#courseSave').addEventListener('click', saveCourse);
+}
+
+function fillCourseDatalist() {
+  const el = $('#courseOptions');
+  el.innerHTML = COURSE_OPTIONS;
 }

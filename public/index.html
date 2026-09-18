@@ -14,19 +14,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <title>RU UFOP</title>
-  <link rel="stylesheet" href="/style.css?v=6">
+  <link rel="stylesheet" href="/style.css?v=7">
 </head>
 <body>
   <header>
     <div class="brand">
       <span class="logo">🍽️</span>
       <div>
-        <div class="brand-name">RU UFOP</div>
-        <div class="brand-sub">quem vai comer?</div>
+      <div class="brand-name">RU UFOP</div>
+      <div id="brandSub" class="brand-sub">quem vai comer?</div>
       </div>
     </div>
-    <span id="status" class="badge">…</span>
-    <button id="logoutBtn" class="link-btn" title="Trocar de conta">sair</button>
+    <span id="status" class="badge"></span>
+    <button id="logoutBtn" class="link-btn hidden" title="Trocar de conta">sair</button>
   </header>
 
   <main>
@@ -39,7 +39,7 @@
     </div>
   </main>
 
-  <button id="announceBtn" class="fab">➕ Anunciar</button>
+  <button id="announceBtn" class="fab hidden">➕ Anunciar</button>
 
   <div id="emailOverlay" class="overlay center hidden">
     <div class="card auth">
@@ -51,7 +51,23 @@
     </div>
   </div>
 
-  <div id="modal" class="overlay">
+  <div id="courseOverlay" class="overlay center hidden">
+    <div class="card auth">
+      <img id="coursePhoto" class="auth-photo hidden" alt="">
+      <div class="auth-icon" id="coursePhotoFbk">🎓</div>
+      <h1 id="courseName"></h1>
+      <p id="courseMsg" class="sub"></p>
+      <input id="courseInput" list="courseOptions" type="text" placeholder="Seu curso na UFOP" autocomplete="off">
+      <datalist id="courseOptions"></datalist>
+      <div id="courseError" class="error hidden"></div>
+      <div class="actions">
+        <button id="courseCancel" class="ghost">Cancelar</button>
+        <button id="courseSave" class="primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="overlay center hidden">
     <div class="sheet">
       <div class="sheet-grab"></div>
       <h2>Vou comer no RU…</h2>
@@ -59,17 +75,13 @@
         <button id="tabIn" class="tab active">Em quanto tempo?</button>
         <button id="tabExact" class="tab">Hora exata</button>
       </div>
-
       <div id="panelIn" class="panel">
         <div class="chips" id="chips"></div>
       </div>
-
       <div id="panelExact" class="panel hidden">
         <input type="time" id="exactTime" value="19:00">
       </div>
-
       <div class="preview" id="preview"></div>
-
       <div class="actions">
         <button id="cancelBtn" class="ghost">Cancelar</button>
         <button id="confirmBtn" class="primary">Confirmar</button>
@@ -77,7 +89,7 @@
     </div>
   </div>
 
-  <div id="menuModal" class="overlay">
+  <div id="menuModal" class="overlay center hidden">
     <div class="sheet">
       <div class="sheet-grab"></div>
       <h2>🍽️ Cardápio do dia</h2>
@@ -99,6 +111,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="/app.js?v=5"></script>
+  <script src="/app.js?v=res"></script>
 </body>
 </html>

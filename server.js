@@ -39,7 +39,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
   });
 }
 
-let db = { announcements: [], menus: [], subscriptions: [] };
+let db = { announcements: [], menus: [], subscriptions: [], users: {} };
 
 async function loadData() {
   if (redis) {
@@ -54,8 +54,9 @@ async function loadData() {
   try {
     db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   } catch {
-    db = { announcements: [], menus: [], subscriptions: [] };
+    db = { announcements: [], menus: [], subscriptions: [], users: {} };
   }
+  if (!db.users) db.users = {};
 }
 
 async function save() {
@@ -185,6 +186,7 @@ async function verifyGoogleCredential(credential) {
     sub: String(p.sub).slice(0, 80),
     email,
     name: String(p.name || p.given_name || nameFromEmail(email)).slice(0, 60),
+    photo: String(p.picture || '').slice(0, 400),
   };
 }
 
@@ -227,11 +229,14 @@ app.post('/api/announce', requireAuth, async (req, res) => {
       (a.userId !== userId || new Date(a.arrive).getTime() <= now)
   );
   const name = req.user.name || nameFromEmail(email);
+  const profile = db.users[userId] || {};
   const announcement = {
     id: crypto.randomUUID(),
     userId,
     email,
     name,
+    photo: profile.photo || '',
+    course: profile.course || '',
     announceAt: new Date().toISOString(),
     arrive: info.arrive.toISOString(),
     inMinutes: info.inMinutes,
@@ -283,6 +288,7 @@ app.post('/api/menu', requireAuth, (req, res, next) => {
   };
   db.menus.push(menu);
   await save();
+  sendPush('🍽️ Cardápio atualizado', `${meal === 'jantar' ? 'Jantar' : 'Almoço'} — ${dateLabel}`);
   res.json(menu);
 });
 
@@ -316,7 +322,45 @@ app.post('/api/auth/google', async (req, res) => {
     return res.status(401).json({ error: 'a verificação do Google falhou' });
   }
   if (!user) return res.status(401).json({ error: 'use sua conta @aluno.ufop.edu.br' });
-  res.json({ token: signSession(user), email: user.email, name: user.name });
+  const existing = db.users[user.sub] || {};
+  db.users[user.sub] = {
+    sub: user.sub,
+    email: user.email,
+    name: user.name,
+    photo: user.photo || existing.photo || '',
+    course: existing.course || '',
+    updatedAt: new Date().toISOString(),
+  };
+  await save();
+  res.json({
+    token: signSession(user),
+    email: user.email,
+    name: user.name,
+    photo: db.users[user.sub].photo,
+    course: db.users[user.sub].course,
+    needsCourse: !db.users[user.sub].course,
+  });
+});
+
+app.get('/api/me', requireAuth, (req, res) => {
+  const u = db.users[req.user.sub] || { sub: req.user.sub, email: req.user.email, name: req.user.name, photo: '', course: '' };
+  res.json({ email: u.email, name: u.name, photo: u.photo || '', course: u.course || '' });
+});
+
+app.post('/api/me', requireAuth, async (req, res) => {
+  const course = String(req.body.course || '').trim().slice(0, 80);
+  if (!course) return res.status(400).json({ error: 'informe seu curso' });
+  const u = db.users[req.user.sub] || {};
+  db.users[req.user.sub] = {
+    sub: req.user.sub,
+    email: req.user.email,
+    name: req.user.name,
+    photo: u.photo || '',
+    course,
+    updatedAt: new Date().toISOString(),
+  };
+  await save();
+  res.json(db.users[req.user.sub]);
 });
 
 loadData().then(() => {
