@@ -237,9 +237,18 @@ function arrivalInfo(body) {
   };
 }
 
+function purgeExpiredAnnouncements() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const cutoff = d.getTime();
+  const before = db.announcements.length;
+  db.announcements = db.announcements.filter((a) => new Date(a.arrive).getTime() >= cutoff);
+  return db.announcements.length !== before;
+}
+
 app.get('/api/announcements', (req, res) => {
-  const now = Date.now();
-  const list = db.announcements.filter((a) => new Date(a.arrive).getTime() > now - MAX_AGE);
+  if (purgeExpiredAnnouncements()) save();
+  const list = db.announcements;
   res.json(
     list.map((a) => {
       if (!a.email) return a;
@@ -284,6 +293,26 @@ app.post('/api/announce', requireAuth, async (req, res) => {
   await save();
   sendPush(name, `Vai comer no RU ${info.label}`);
   res.json(announcement);
+});
+
+app.put('/api/announce/:id', requireAuth, async (req, res) => {
+  const email = req.user.email;
+  const idx = db.announcements.findIndex((a) => a.id === req.params.id && a.email === email);
+  if (idx === -1) return res.status(404).json({ error: 'aviso não encontrado' });
+  const info = arrivalInfo(req.body);
+  if (!info) return res.status(400).json({ error: 'horário inválido' });
+  const name = db.announcements[idx].name || req.user.name || nameFromEmail(email);
+  db.announcements[idx] = {
+    ...db.announcements[idx],
+    arrive: info.arrive.toISOString(),
+    inMinutes: info.inMinutes,
+    exact: info.exact,
+    label: info.label,
+    updatedAt: new Date().toISOString(),
+  };
+  await save();
+  sendPush(name, `Atualizou o horário: vai comer no RU ${info.label}`);
+  res.json(db.announcements[idx]);
 });
 
 app.get('/api/menu', (req, res) => {

@@ -16,6 +16,7 @@ const state = {
   menuTab: null,
   pendingMenu: null,
   pendingPhoto: '',
+  editingId: '',
 };
 
 const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
@@ -217,6 +218,14 @@ async function renderTimeline() {
     clock.textContent = fmtClock(a.arrive);
 
     card.append(avatar, info, clock);
+    if (a.email === state.email) {
+      const edit = document.createElement('button');
+      edit.className = 'edit-ann';
+      edit.textContent = '✏️';
+      edit.title = 'Editar horário';
+      edit.addEventListener('click', () => openEditModal(a));
+      card.appendChild(edit);
+    }
     container.appendChild(card);
   }
 }
@@ -256,6 +265,7 @@ function syncModal() {
   $('#tabExact').classList.toggle('active', state.mode === 'exact');
   $('#panelIn').classList.toggle('hidden', state.mode !== 'in');
   $('#panelExact').classList.toggle('hidden', state.mode !== 'exact');
+  $('#exactTime').value = state.exact;
   for (const chip of $('#chips').children) {
     chip.classList.toggle('selected', state.mode === 'in' && state.minutes === parseInt(chip.dataset.m, 10));
   }
@@ -263,6 +273,27 @@ function syncModal() {
 }
 
 function openModal() {
+  state.editingId = '';
+  $('#announceTitle').textContent = 'Vou comer no RU…';
+  syncModal();
+  $('#modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function openEditModal(a) {
+  state.editingId = a.id;
+  $('#announceTitle').textContent = 'Editar horário';
+  if (a.exact) {
+    state.mode = 'exact';
+    const d = new Date(a.arrive);
+    state.exact = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  } else {
+    state.mode = 'in';
+    state.minutes = MODAL_MINUTES.reduce(
+      (best, m) => (Math.abs(m - a.inMinutes) < Math.abs(best - a.inMinutes) ? m : best),
+      MODAL_MINUTES[0]
+    );
+  }
   syncModal();
   $('#modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -276,18 +307,20 @@ function closeModal() {
 async function confirmAnnounce() {
   const r = arrival();
   const payload = { when: r.when, arrive: r.arrive, label: r.label };
+  const isEdit = !!state.editingId;
   $('#confirmBtn').textContent = 'Enviando…';
   $('#confirmBtn').disabled = true;
   try {
-    const resp = await fetch('/api/announce', {
-      method: 'POST',
+    const resp = await fetch(isEdit ? `/api/announce/${state.editingId}` : '/api/announce', {
+      method: isEdit ? 'PUT' : 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
     });
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
+    state.editingId = '';
     closeModal();
-    toast('Aviso enviado! 🔔');
+    toast(isEdit ? 'Horário atualizado! 🔔' : 'Aviso enviado! 🔔');
     renderTimeline();
   } catch {
     toast('Falha ao enviar. Tente de novo.');
