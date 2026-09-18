@@ -21,14 +21,14 @@ const state = {
 const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
 
 const COURSES = [
-  'Arquitetura e Urbanismo', 'Artes Escénicas', 'Ciencia de la Computación',
-  'Ciencia y Tecnología de Alimentos', 'Ciencias Biológicas', 'Derecho',
-  'Educación Física', 'Estadística y Ciencia de Datos', 'Farmacia', 'Filosofía',
-  'Física', 'Ingeniería Ambiental', 'Ingeniería Civil',
-  'Ingeniería de Control y Automatización', 'Ingeniería de Minas',
-  'Ingeniería de Producción', 'Ingeniería Geológica', 'Ingeniería Mecánica',
-  'Ingeniería Metalúrgica', 'Ingeniería Urbana', 'Inteligencia Artificial',
-  'Matemática', 'Medicina', 'Museología', 'Música', 'Nutrición', 'Química',
+  'Arquitetura e Urbanismo', 'Artes Cênicas', 'Ciência da Computação',
+  'Ciência e Tecnologia de Alimentos', 'Ciências Biológicas', 'Direito',
+  'Educação Física', 'Estatística e Ciência de Dados', 'Farmácia', 'Filosofia',
+  'Física', 'Engenharia Ambiental', 'Engenharia Civil',
+  'Engenharia de Controle e Automação', 'Engenharia de Minas',
+  'Engenharia de Produção', 'Engenharia Geológica', 'Engenharia Mecânica',
+  'Engenharia Metalúrgica', 'Engenharia Urbana', 'Inteligência Artificial',
+  'Matemática', 'Medicina', 'Museologia', 'Música', 'Nutrição', 'Química',
   'Química Industrial', 'Turismo',
 ];
 const COURSE_OPTIONS = COURSES.map((c) => `<option value="${c}">${c}</option>`).join('');

@@ -240,7 +240,14 @@ function arrivalInfo(body) {
 app.get('/api/announcements', (req, res) => {
   const now = Date.now();
   const list = db.announcements.filter((a) => new Date(a.arrive).getTime() > now - MAX_AGE);
-  res.json(list);
+  res.json(
+    list.map((a) => {
+      if (!a.email) return a;
+      const prof = profileOf(a.email);
+      if (!prof || !prof.email) return a;
+      return { ...a, name: prof.name || a.name, photo: prof.photo || '', course: prof.course || a.course || '' };
+    })
+  );
 });
 
 function profileOf(email, sub) {
