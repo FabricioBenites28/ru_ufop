@@ -9,6 +9,7 @@
   "dependencies": {
     "@upstash/redis": "^1.38.4",
     "express": "^4.19.2",
+    "google-auth-library": "^9.15.1",
     "web-push": "^3.6.7"
   }
 }

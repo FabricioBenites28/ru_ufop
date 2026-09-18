@@ -3,11 +3,10 @@ const $ = (s) => document.querySelector(s);
 const MODAL_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120];
 const DAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 const WEEKDAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-const EMAIL_RE = /^[a-z0-9._%+\-]+@(?:aluno\.)?ufop\.edu\.br$/i;
 
 const state = {
-  email: localStorage.getItem('ru_email') || '',
-  userId: localStorage.getItem('ru_userId') || crypto.randomUUID(),
+  session: localStorage.getItem('ru_session') || '',
+  name: localStorage.getItem('ru_name') || '',
   mode: 'in',
   minutes: 30,
   exact: '19:00',
@@ -15,14 +14,16 @@ const state = {
   pendingMenu: null,
 };
 
-localStorage.setItem('ru_userId', state.userId);
+function authHeaders(extra = {}) {
+  const headers = { 'Content-Type': 'application/json', ...extra };
+  if (state.session) headers.Authorization = 'Bearer ' + state.session;
+  return headers;
+}
 
-function nameFromEmail(email) {
-  const local = email.split('@')[0].replace(/[._]+/g, ' ').trim();
-  return local
-    .split(' ')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(' ');
+function logout() {
+  localStorage.removeItem('ru_session');
+  localStorage.removeItem('ru_name');
+  location.reload();
 }
 
 function fmtClock(iso) {
@@ -194,15 +195,16 @@ function closeModal() {
 
 async function confirmAnnounce() {
   const r = arrival();
-  const payload = { email: state.email, userId: state.userId, when: r.when, arrive: r.arrive, label: r.label };
+  const payload = { when: r.when, arrive: r.arrive, label: r.label };
   $('#confirmBtn').textContent = 'Enviando…';
   $('#confirmBtn').disabled = true;
   try {
     const resp = await fetch('/api/announce', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify(payload),
     });
+    if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
     closeModal();
     toast('Aviso enviado! 🔔');
@@ -230,6 +232,7 @@ function start() {
   $('#menuText').addEventListener('input', refreshMenuPreview);
   $('#menuCancel').addEventListener('click', closeMenuModal);
   $('#menuSave').addEventListener('click', saveMenu);
+  $('#logoutBtn').addEventListener('click', logout);
 
   setInterval(renderTimeline, 30000);
   document.addEventListener('visibilitychange', () => {
@@ -347,15 +350,15 @@ async function saveMenu() {
   try {
     const resp = await fetch('/api/menu', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({
-        email: state.email,
         meal: p.meal,
         date: p.date,
         dateLabel: p.dateLabel,
         items: p.items,
       }),
     });
+    if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
     closeMenuModal();
     state.menuTab = p.meal;
@@ -460,34 +463,72 @@ async function renderMenu() {
   container.appendChild(card);
 }
 
-function initEmail() {
-  const input = $('#emailInput');
-  const error = $('#emailError');
-  const ok = () => {
-    const email = input.value.trim().toLowerCase();
-    if (!EMAIL_RE.test(email)) {
-      error.classList.remove('hidden');
-      return;
-    }
-    error.classList.add('hidden');
-    state.email = email;
-    localStorage.setItem('ru_email', email);
-    $('#emailOverlay').classList.add('hidden');
-    const name = nameFromEmail(email);
-    $('.brand-sub').textContent = `oi, ${name.split(' ')[0]} 👋`;
-    start();
-  };
-  $('#emailOk').addEventListener('click', ok);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') ok();
-  });
-  input.focus();
+function handleAuthExpired() {
+  toast('Sessão expirada. Entre de novo.');
+  setTimeout(logout, 1200);
 }
 
-if (state.email) {
-  $('.brand-sub').textContent = `oi, ${nameFromEmail(state.email).split(' ')[0]} 👋`;
+async function initGoogle() {
+  let cfg;
+  try {
+    cfg = await (await fetch('/api/config')).json();
+  } catch {
+    return;
+  }
+  if (!cfg.googleClientId) {
+    $('#authError').textContent = 'Login do Google ainda não configurado no servidor.';
+    $('#authError').classList.remove('hidden');
+    return;
+  }
+  if (typeof google === 'undefined' || !google.accounts) {
+    setTimeout(() => initGoogle(), 300);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: cfg.googleClientId,
+    auto_select: false,
+    callback: handleCredential,
+  });
+  google.accounts.id.renderButton(document.getElementById('gButton'), {
+    theme: 'outline',
+    size: 'large',
+    shape: 'pill',
+    text: 'continue_with',
+    width: 290,
+  });
+}
+
+async function handleCredential(response) {
+  try {
+    const resp = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    if (resp.status === 401) {
+      $('#authError').textContent = 'Essa conta não é da UFOP. Use seu e-mail @aluno.ufop.edu.br.';
+      $('#authError').classList.remove('hidden');
+      return;
+    }
+    if (!resp.ok) throw new Error('invalid');
+    const data = await resp.json();
+    state.session = data.token;
+    state.name = data.name;
+    localStorage.setItem('ru_session', data.token);
+    localStorage.setItem('ru_name', data.name);
+    $('.brand-sub').textContent = `oi, ${data.name.split(' ')[0]} 👋`;
+    $('#emailOverlay').classList.add('hidden');
+    start();
+  } catch {
+    $('#authError').textContent = 'Falha ao entrar. Tente de novo.';
+    $('#authError').classList.remove('hidden');
+  }
+}
+
+if (state.session) {
+  $('.brand-sub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
   start();
 } else {
   $('#emailOverlay').classList.remove('hidden');
-  initEmail();
+  initGoogle();
 }

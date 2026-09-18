@@ -3,10 +3,16 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const webpush = require('web-push');
+const { OAuth2Client } = require('google-auth-library');
 
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
 const VAPID_FILE = path.join(__dirname, '.vapid.json');
+const SECRET_FILE = path.join(__dirname, '.session-secret');
+const SESSION_DAYS = 30;
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 const MAX_AGE = 24 * 60 * 60 * 1000;
 const REDIS_KEY = 'ru:data';
 
@@ -108,6 +114,79 @@ function sendPush(title, body) {
 
 const EMAIL_RE = /^[a-z0-9._%+\-]+@(?:aluno\.)?ufop\.edu\.br$/i;
 
+function loadSessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  try {
+    return fs.readFileSync(SECRET_FILE, 'utf8').trim();
+  } catch {
+    const secret = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(SECRET_FILE, secret);
+    console.error('SESSION_SECRET não definido: gerei um local em', SECRET_FILE);
+    return secret;
+  }
+}
+
+const sessionSecret = loadSessionSecret();
+
+function b64url(obj) {
+  return Buffer.from(JSON.stringify(obj)).toString('base64url');
+}
+
+function signSession(user) {
+  const body = b64url({
+    sub: user.sub,
+    email: user.email,
+    name: user.name,
+    exp: Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400,
+  });
+  const sig = crypto.createHmac('sha256', sessionSecret).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+function verifySession(token) {
+  try {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 2) return null;
+    const [body, sig] = parts;
+    const expected = crypto.createHmac('sha256', sessionSecret).update(body).digest('base64url');
+    const a = Buffer.from(sig);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (!payload.sub || !payload.email) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  const user = verifySession(token);
+  if (!user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
+  req.user = user;
+  next();
+}
+
+async function verifyGoogleCredential(credential) {
+  if (!googleClient) return null;
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: GOOGLE_CLIENT_ID,
+  });
+  const p = ticket.getPayload();
+  if (!p || !p.email_verified || !p.sub) return null;
+  const email = String(p.email || '').trim().toLowerCase().slice(0, 80);
+  if (!EMAIL_RE.test(email)) return null;
+  return {
+    sub: String(p.sub).slice(0, 80),
+    email,
+    name: String(p.name || p.given_name || nameFromEmail(email)).slice(0, 60),
+  };
+}
+
 function nameFromEmail(email) {
   const local = email.split('@')[0].replace(/[._]+/g, ' ').trim();
   return local
@@ -135,19 +214,18 @@ app.get('/api/announcements', (req, res) => {
   res.json(list);
 });
 
-app.post('/api/announce', async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 80);
-  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'e-mail UFOP inválido' });
+app.post('/api/announce', requireAuth, async (req, res) => {
+  const email = req.user.email;
   const info = arrivalInfo(req.body);
   if (!info) return res.status(400).json({ error: 'horário inválido' });
-  const userId = String(req.body.userId || '');
+  const userId = req.user.sub;
   const now = Date.now();
   db.announcements = db.announcements.filter(
     (a) =>
       new Date(a.arrive).getTime() > now - MAX_AGE &&
       (a.userId !== userId || new Date(a.arrive).getTime() <= now)
   );
-  const name = nameFromEmail(email);
+  const name = req.user.name || nameFromEmail(email);
   const announcement = {
     id: crypto.randomUUID(),
     userId,
@@ -170,9 +248,8 @@ app.get('/api/menu', (req, res) => {
   res.json(menus);
 });
 
-app.post('/api/menu', async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase().slice(0, 80);
-  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'e-mail UFOP inválido' });
+app.post('/api/menu', requireAuth, async (req, res) => {
+  const email = req.user.email;
   const meal = String(req.body.meal || '');
   if (!['almoço', 'jantar'].includes(meal)) return res.status(400).json({ error: 'refeição inválida' });
   const date = String(req.body.date || '');
@@ -215,6 +292,25 @@ app.post('/api/subscribe', async (req, res) => {
 
 app.get('/api/vapid', (req, res) => {
   res.json({ publicKey: vapid.publicKey });
+});
+
+app.get('/api/config', (req, res) => {
+  res.json({ googleClientId: GOOGLE_CLIENT_ID });
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  const credential = String(req.body.credential || '');
+  if (!GOOGLE_CLIENT_ID || !credential) {
+    return res.status(400).json({ error: 'credencial inválida' });
+  }
+  let user;
+  try {
+    user = await verifyGoogleCredential(credential);
+  } catch (err) {
+    return res.status(401).json({ error: 'a verificação do Google falhou' });
+  }
+  if (!user) return res.status(401).json({ error: 'use sua conta @aluno.ufop.edu.br' });
+  res.json({ token: signSession(user), email: user.email, name: user.name });
 });
 
 loadData().then(() => {
