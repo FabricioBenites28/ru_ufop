@@ -14,9 +14,10 @@ try {
 } catch {}
 
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
-const VAPID_FILE = path.join(__dirname, '.vapid.json');
-const SECRET_FILE = path.join(__dirname, '.session-secret');
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
+const VAPID_FILE = path.join(DATA_DIR, '.vapid.json');
+const SECRET_FILE = path.join(DATA_DIR, '.session-secret');
 const SESSION_DAYS = 30;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -67,6 +68,24 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
 
 let db = { announcements: [], menus: [], subscriptions: [], users: {} };
 
+function normalizeDb() {
+  if (!Array.isArray(db.announcements)) db.announcements = [];
+  if (!Array.isArray(db.menus)) db.menus = [];
+  if (!Array.isArray(db.subscriptions)) db.subscriptions = [];
+  if (!db.users || typeof db.users !== 'object') db.users = {};
+  for (const k of Object.keys(db.users)) {
+    const u = db.users[k];
+    if (!u || typeof u !== 'object') {
+      delete db.users[k];
+      continue;
+    }
+    u.friends = Array.isArray(u.friends) ? u.friends : [];
+    u.incoming = Array.isArray(u.incoming) ? u.incoming : [];
+    u.outgoing = Array.isArray(u.outgoing) ? u.outgoing : [];
+  }
+  return db;
+}
+
 async function loadData() {
   if (redis) {
     try {
@@ -75,22 +94,33 @@ async function loadData() {
     } catch (err) {
       console.error('erro ao ler do Redis:', err.message);
     }
+    normalizeDb();
     return;
   }
   try {
     db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!db || typeof db !== 'object') throw new Error('dados corrompidos');
   } catch {
     db = { announcements: [], menus: [], subscriptions: [], users: {} };
   }
-  if (!db.users) db.users = {};
+  normalizeDb();
+}
+
+function writeDbFile() {
+  const tmp = DATA_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(db));
+  fs.renameSync(tmp, DATA_FILE);
 }
 
 async function save() {
   try {
     if (redis) {
+      db = normalizeDb();
       await redis.set(REDIS_KEY, db);
     } else {
-      fs.writeFileSync(DATA_FILE, JSON.stringify(db));
+      normalizeDb();
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      writeDbFile();
     }
   } catch (err) {
     console.error('erro ao salvar:', err.message);
@@ -246,9 +276,15 @@ function purgeExpiredAnnouncements() {
   return db.announcements.length !== before;
 }
 
-app.get('/api/announcements', (req, res) => {
+app.get('/api/announcements', optionalAuth, (req, res) => {
   if (purgeExpiredAnnouncements()) save();
-  const list = db.announcements;
+  let list = db.announcements;
+  if (req.query.scope === 'friends') {
+    if (!req.user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
+    const me = ensureUser(req.user);
+    const allowed = new Set([...me.friends, req.user.email]);
+    list = list.filter((a) => a.email && allowed.has(a.email));
+  }
   res.json(
     list.map((a) => {
       if (!a.email) return a;
@@ -261,6 +297,48 @@ app.get('/api/announcements', (req, res) => {
 
 function profileOf(email, sub) {
   return db.users[email] || db.users[sub] || {};
+}
+
+function ensureUser(user) {
+  let u = db.users[user.email];
+  if (!u) {
+    u = {
+      sub: user.sub || '',
+      email: user.email,
+      name: user.name || '',
+      photo: '',
+      course: '',
+      friends: [],
+      incoming: [],
+      outgoing: [],
+      updatedAt: new Date().toISOString(),
+    };
+    db.users[user.email] = u;
+  }
+  u.friends = Array.isArray(u.friends) ? u.friends : [];
+  u.incoming = Array.isArray(u.incoming) ? u.incoming : [];
+  u.outgoing = Array.isArray(u.outgoing) ? u.outgoing : [];
+  return u;
+}
+
+function relation(email, me) {
+  if (email === me.email) return 'self';
+  if (me.friends.includes(email)) return 'friend';
+  if (me.incoming.includes(email)) return 'incoming';
+  if (me.outgoing.includes(email)) return 'outgoing';
+  return 'none';
+}
+
+function friendProfile(email) {
+  const u = db.users[email] || {};
+  return { email, name: u.name || '', photo: u.photo || '', course: u.course || '' };
+}
+
+function optionalAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  req.user = verifySession(token) || null;
+  next();
 }
 
 app.post('/api/announce', requireAuth, async (req, res) => {
@@ -397,6 +475,9 @@ app.post('/api/auth/google', async (req, res) => {
     name: user.name,
     photo: user.photo || existing.photo || legacy.photo || '',
     course: existing.course || legacy.course || '',
+    friends: Array.isArray(existing.friends) ? existing.friends : [],
+    incoming: Array.isArray(existing.incoming) ? existing.incoming : [],
+    outgoing: Array.isArray(existing.outgoing) ? existing.outgoing : [],
     updatedAt: new Date().toISOString(),
   };
   if (db.users[user.sub] && user.sub !== user.email) delete db.users[user.sub];
@@ -421,22 +502,124 @@ app.post('/api/me', requireAuth, async (req, res) => {
   if (!course) return res.status(400).json({ error: 'informe seu curso' });
   let photo = String(req.body.photo || '').trim().slice(0, 400000);
   if (photo && !photo.startsWith('data:image/')) photo = '';
-  const u = profileOf(req.user.email, req.user.sub);
+  const u = ensureUser(req.user);
   db.users[req.user.email] = {
     sub: req.user.sub,
     email: req.user.email,
     name: req.user.name,
     photo: photo || u.photo || '',
     course,
+    friends: u.friends,
+    incoming: u.incoming,
+    outgoing: u.outgoing,
     updatedAt: new Date().toISOString(),
   };
   await save();
   res.json(db.users[req.user.email]);
 });
 
+app.get('/api/users', requireAuth, (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase().slice(0, 80);
+  if (!q) return res.json([]);
+  const me = ensureUser(req.user);
+  const out = [];
+  for (const email of Object.keys(db.users)) {
+    if (email === req.user.email) continue;
+    const u = db.users[email];
+    const name = String(u.name || '').toLowerCase();
+    if (!email.includes(q) && !name.includes(q)) continue;
+    out.push({ email, name: u.name || '', photo: u.photo || '', course: u.course || '', state: relation(email, me) });
+    if (out.length >= 10) break;
+  }
+  res.json(out);
+});
+
+app.get('/api/friends', requireAuth, (req, res) => {
+  const me = ensureUser(req.user);
+  res.json({
+    friends: me.friends.map(friendProfile),
+    incoming: me.incoming.map((e) => ({ ...friendProfile(e), state: 'incoming' })),
+    outgoing: me.outgoing.map((e) => ({ ...friendProfile(e), state: 'outgoing' })),
+  });
+});
+
+app.post('/api/friends', requireAuth, async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'e-mail UFOP inválido' });
+  if (email === req.user.email) return res.status(400).json({ error: 'você não pode se adicionar' });
+  const me = ensureUser(req.user);
+  const target = db.users[email];
+  if (!target) return res.status(404).json({ error: 'usuário não encontrado. Peça para ele entrar no app primeiro.' });
+  if (me.friends.includes(email)) return res.json({ ok: true, state: 'friend' });
+  if (me.outgoing.includes(email)) return res.json({ ok: true, state: 'outgoing' });
+  if (me.incoming.includes(email)) {
+    me.incoming = me.incoming.filter((e) => e !== email);
+    if (!me.friends.includes(email)) me.friends.push(email);
+    target.outgoing = target.outgoing.filter((e) => e !== me.email);
+    if (!target.friends.includes(me.email)) target.friends.push(me.email);
+    await save();
+    return res.json({ ok: true, state: 'friend' });
+  }
+  me.outgoing.push(email);
+  if (!target.incoming.includes(me.email)) target.incoming.push(me.email);
+  await save();
+  res.json({ ok: true, state: 'outgoing' });
+});
+
+app.post('/api/friends/accept', requireAuth, async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const me = ensureUser(req.user);
+  if (!me.incoming.includes(email)) return res.status(404).json({ error: 'pedido não encontrado' });
+  const target = db.users[email];
+  if (!target) return res.status(404).json({ error: 'usuário não encontrado' });
+  me.incoming = me.incoming.filter((e) => e !== email);
+  if (!me.friends.includes(email)) me.friends.push(email);
+  target.outgoing = target.outgoing.filter((e) => e !== me.email);
+  if (!target.friends.includes(me.email)) target.friends.push(me.email);
+  await save();
+  res.json({ ok: true, state: 'friend' });
+});
+
+app.post('/api/friends/decline', requireAuth, async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const me = ensureUser(req.user);
+  me.incoming = me.incoming.filter((e) => e !== email);
+  const target = db.users[email];
+  if (target) target.outgoing = target.outgoing.filter((e) => e !== me.email);
+  await save();
+  res.json({ ok: true });
+});
+
+app.delete('/api/friends/:email', requireAuth, async (req, res) => {
+  const email = String(req.params.email || '').trim().toLowerCase();
+  const me = ensureUser(req.user);
+  me.friends = me.friends.filter((e) => e !== email);
+  me.incoming = me.incoming.filter((e) => e !== email);
+  me.outgoing = me.outgoing.filter((e) => e !== email);
+  const target = db.users[email];
+  if (target) {
+    target.friends = target.friends.filter((e) => e !== me.email);
+    target.incoming = target.incoming.filter((e) => e !== me.email);
+    target.outgoing = target.outgoing.filter((e) => e !== me.email);
+  }
+  await save();
+  res.json({ ok: true });
+});
+
 loadData().then(() => {
   app.listen(PORT, () => {
     console.log(`RU UFOP rodando na porta ${PORT}`);
-    if (redis) console.log('persistência: Upstash Redis');
+    if (redis) {
+      console.log('persistência: Upstash Redis');
+    } else {
+      console.log(`persistência: arquivo local em ${DATA_FILE}`);
+      if (process.env.RENDER && !process.env.DATA_DIR) {
+        console.error('\nAVISO: você está no Render sem persistência permanente!');
+        console.error('data.json (perfis, amigos, cardápios e avisos) some a cada restart/deploy.');
+        console.error('Resolva com uma das opções:');
+        console.error('  1) Disco persistente do Render + variável de ambiente DATA_DIR=/data');
+        console.error('  2) Upstash Redis (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN)\n');
+      }
+    }
   });
 });

@@ -26,12 +26,17 @@
       </div>
     </div>
     <span id="status" class="badge"></span>
+    <button id="friendsBtn" class="avatar-btn hidden" title="Amigos">👥</button>
     <button id="profileBtn" class="avatar-btn hidden" title="Meu perfil">👤</button>
     <button id="logoutBtn" class="link-btn hidden" title="Trocar de conta">sair</button>
   </header>
 
   <main>
     <section id="menuSection"></section>
+    <div id="scopeBar" class="tabs scope-bar hidden">
+      <button id="scopeAllBtn" class="tab active">Todos</button>
+      <button id="scopeFriendsBtn" class="tab">Amigos</button>
+    </div>
     <section id="timeline"></section>
     <div id="empty" class="empty hidden">
       <div class="empty-emoji">🍃</div>
@@ -126,6 +131,20 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <div id="friendsOverlay" class="overlay center hidden">
+    <div class="sheet friends-sheet">
+      <div class="sheet-grab"></div>
+      <h2>👥 Amigos</h2>
+      <p class="sub friends-sub">Adicione colegas para ver os avisos só deles no feed Amigos.</p>
+      <input id="friendSearch" type="search" placeholder="Buscar por e-mail ou nome…" autocomplete="off">
+      <div id="friendResults" class="friend-rows"></div>
+      <div id="friendSections" class="friend-sections"></div>
+      <div class="actions">
+        <button id="friendsClose" class="ghost wide">Fechar</button>
+      </div>
     </div>
   </div>
 

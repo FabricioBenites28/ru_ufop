@@ -17,6 +17,7 @@ const state = {
   pendingMenu: null,
   pendingPhoto: '',
   editingId: '',
+  scope: localStorage.getItem('ru_scope') || 'all',
 };
 
 const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
@@ -62,6 +63,9 @@ function applyProfile(p) {
   pb.classList.remove('hidden');
   $('#logoutBtn').classList.remove('hidden');
   $('#announceBtn').classList.remove('hidden');
+  $('#friendsBtn').classList.remove('hidden');
+  $('#scopeBar').classList.remove('hidden');
+  syncScopeTabs();
   $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
 }
 
@@ -87,6 +91,8 @@ function openLogin() {
   $('#logoutBtn').classList.add('hidden');
   $('#profileBtn').classList.add('hidden');
   $('#announceBtn').classList.add('hidden');
+  $('#friendsBtn').classList.add('hidden');
+  $('#scopeBar').classList.add('hidden');
   $('#emailOverlay').classList.remove('hidden');
   $('#gButton').innerHTML = '';
   $('#authError').classList.add('hidden');
@@ -161,7 +167,9 @@ function dayLabel(iso) {
 async function renderTimeline() {
   let list = [];
   try {
-    list = await (await fetch('/api/announcements')).json();
+    const resp = await fetch('/api/announcements' + (state.scope === 'friends' ? '?scope=friends' : ''), { headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    list = await resp.json();
     setStatus(true);
   } catch {
     setStatus(false);
@@ -170,7 +178,17 @@ async function renderTimeline() {
 
   const container = $('#timeline');
   container.innerHTML = '';
-  $('#empty').classList.toggle('hidden', list.length > 0);
+  const empty = $('#empty');
+  const emptyTitle = empty.querySelector('p');
+  const emptySub = empty.querySelector('.sub');
+  if (state.scope === 'friends') {
+    emptyTitle.textContent = 'Nada dos seus amigos por aqui.';
+    emptySub.textContent = 'Peça para eles anunciarem — ou adicione mais amigos. 👥';
+  } else {
+    emptyTitle.textContent = 'Ninguém anunciou ainda.';
+    emptySub.textContent = 'Quando for, toque em ➕ Anunciar para avisar o pessoal.';
+  }
+  empty.classList.toggle('hidden', list.length > 0);
 
   let lastDay = '';
   for (const a of list) {
@@ -351,6 +369,17 @@ function start() {
   $('#previewBack').addEventListener('click', () => goMenuStep(0));
   $('#menuSave').addEventListener('click', saveMenu);
   $('#logoutBtn').addEventListener('click', logout);
+
+  $('#friendsBtn').addEventListener('click', openFriends);
+  $('#friendsClose').addEventListener('click', closeFriends);
+  $('#scopeAllBtn').addEventListener('click', () => setScope('all'));
+  $('#scopeFriendsBtn').addEventListener('click', () => setScope('friends'));
+  $('#friendSearch').addEventListener('input', onFriendSearch);
+  $('#friendsOverlay').addEventListener('click', (e) => {
+    const btn = e.target.closest('.mini-act');
+    if (btn && btn.dataset.action) friendAction(btn.dataset.action, btn.dataset.email);
+  });
+  syncScopeTabs();
 
   setInterval(renderTimeline, 30000);
   document.addEventListener('visibilitychange', () => {
@@ -612,6 +641,168 @@ async function renderMenu() {
   }
 
   container.appendChild(card);
+}
+
+function syncScopeTabs() {
+  $('#scopeAllBtn').classList.toggle('active', state.scope === 'all');
+  $('#scopeFriendsBtn').classList.toggle('active', state.scope === 'friends');
+}
+
+function setScope(s) {
+  state.scope = s;
+  localStorage.setItem('ru_scope', s);
+  syncScopeTabs();
+  renderTimeline();
+}
+
+function openFriends() {
+  $('#friendsOverlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  renderFriends();
+  $('#friendSearch').focus();
+}
+
+function closeFriends() {
+  $('#friendsOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+  $('#friendSearch').value = '';
+  $('#friendResults').innerHTML = '';
+}
+
+async function renderFriends() {
+  let data = { friends: [], incoming: [], outgoing: [] };
+  try {
+    const resp = await fetch('/api/friends', { headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) throw new Error('invalid');
+    data = await resp.json();
+  } catch {
+    toast('Falha ao carregar amigos.');
+  }
+  const wrap = $('#friendSections');
+  wrap.innerHTML = '';
+  if (data.incoming.length) wrap.appendChild(friendSection('Pedidos de amizade', data.incoming, 'incoming'));
+  if (data.friends.length) wrap.appendChild(friendSection('Meus amigos', data.friends, 'friend'));
+  if (data.outgoing.length) wrap.appendChild(friendSection('Pedidos enviados', data.outgoing, 'outgoing'));
+}
+
+function friendSection(title, rows, kind) {
+  const box = document.createElement('div');
+  box.className = 'friend-group';
+  const h = document.createElement('div');
+  h.className = 'day-group';
+  h.textContent = title;
+  box.appendChild(h);
+  for (const u of rows) box.appendChild(friendRow(u, kind));
+  return box;
+}
+
+function friendRow(u, kind) {
+  const row = document.createElement('div');
+  row.className = 'friend-row';
+
+  const av = document.createElement('span');
+  av.className = 'avatar mini';
+  if (u.photo) {
+    const img = document.createElement('img');
+    img.src = u.photo;
+    img.alt = u.name;
+    img.referrerPolicy = 'no-referrer';
+    av.appendChild(img);
+  } else {
+    av.textContent = (u.name || u.email).trim().charAt(0).toUpperCase();
+  }
+
+  const info = document.createElement('div');
+  info.className = 'f-info';
+  const nm = document.createElement('div');
+  nm.className = 'name';
+  nm.textContent = u.name || u.email;
+  const em = document.createElement('div');
+  em.className = 'when';
+  em.textContent = u.course ? `${u.email} · ${u.course}` : u.email;
+  info.append(nm, em);
+
+  const acts = document.createElement('div');
+  acts.className = 'mini-acts';
+  const mk = (txt, action, cls) => {
+    const b = document.createElement('button');
+    b.className = 'mini-act' + (cls ? ' ' + cls : '');
+    b.dataset.email = u.email;
+    b.dataset.action = action;
+    b.textContent = txt;
+    acts.appendChild(b);
+  };
+  if (kind === 'friend') mk('Remover', 'remove');
+  else if (kind === 'incoming') { mk('Aceitar', 'accept', 'primary'); mk('Recusar', 'decline', 'ghost'); }
+  else if (kind === 'outgoing') mk('Cancelar', 'cancel');
+  else mk('Adicionar', 'add', 'primary');
+
+  row.append(av, info, acts);
+  return row;
+}
+
+let searchTimer = null;
+function onFriendSearch(e) {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  const box = $('#friendResults');
+  box.innerHTML = '';
+  if (!q) return;
+  searchTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch('/api/users?q=' + encodeURIComponent(q), { headers: authHeaders() });
+      if (resp.status === 401) return handleAuthExpired();
+      if (!resp.ok) throw new Error('invalid');
+      const list = await resp.json();
+      box.innerHTML = '';
+      if (!list.length) {
+        const p = document.createElement('p');
+        p.className = 'sub friends-hint';
+        p.textContent = 'Ninguém com esse nome ou e-mail por aqui.';
+        box.appendChild(p);
+        return;
+      }
+      for (const u of list) {
+        const kind = u.state === 'friend' ? 'friend' : u.state === 'incoming' ? 'incoming' : u.state === 'outgoing' ? 'outgoing' : 'add';
+        box.appendChild(friendRow(u, kind));
+      }
+    } catch {
+      toast('Falha na busca.');
+    }
+  }, 300);
+}
+
+async function friendAction(action, email) {
+  const opts = { method: 'POST', headers: authHeaders() };
+  let url = '';
+  if (action === 'add') url = '/api/friends';
+  else if (action === 'accept' || action === 'decline') url = '/api/friends/' + action;
+  else if (action === 'cancel' || action === 'remove') {
+    url = '/api/friends/' + encodeURIComponent(email);
+    opts.method = 'DELETE';
+  }
+  try {
+    const resp = await fetch(url, { ...opts, body: JSON.stringify({ email }) });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      toast(j.error || 'Falha na ação.');
+      return;
+    }
+    const msg =
+      action === 'add' ? 'Pedido de amizade enviado!' :
+      action === 'accept' ? 'Agora vocês são amigos!' :
+      action === 'decline' ? 'Pedido recusado.' :
+      action === 'cancel' ? 'Pedido cancelado.' : 'Amigo removido.';
+    toast(msg);
+    renderFriends();
+    const q = $('#friendSearch').value.trim();
+    if (q) onFriendSearch({ target: { value: q } });
+    if (state.scope === 'friends') renderTimeline();
+  } catch {
+    toast('Falha. Tente de novo.');
+  }
 }
 
 function handleAuthExpired() {
