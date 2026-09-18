@@ -974,3 +974,6 @@ $('#coursePhotoFile').addEventListener('change', (e) => {
 
 fillCourseDatalist();
 bootstrap();
+
+const logoImg = document.getElementById('logoImg');
+if (logoImg) logoImg.addEventListener('load', () => logoImg.classList.add('loaded'));
