@@ -62,7 +62,35 @@ function logout() {
   localStorage.removeItem('ru_email');
   localStorage.removeItem('ru_photo');
   localStorage.removeItem('ru_course');
-  location.reload();
+  openLogin();
+}
+
+function openLogin() {
+  state.started = false;
+  state.session = '';
+  state.name = '';
+  state.email = '';
+  state.photo = '';
+  state.course = '';
+  $('#emailOverlay').classList.remove('hidden');
+  $('#gButton').innerHTML = '';
+  $('#authError').classList.add('hidden');
+  initGoogle();
+}
+
+function openLogin() {
+  state.started = false;
+  $('#emailOverlay').classList.remove('hidden');
+  $('#authError').classList.add('hidden');
+  start();
+  initGoogle();
+}
+
+function openLogin() {
+  $('#authError').classList.add('hidden');
+  $('#emailOverlay').classList.remove('hidden');
+  wireLogin();
+  initGoogle();
 }
 
 function fmtClock(iso) {
@@ -667,9 +695,7 @@ async function saveCourse() {
 $('#courseCancel').addEventListener('click', closeCourseSheet);
 $('#courseSave').addEventListener('click', saveCourse);
 
-wireCourseOverlay();
-fillCourseDatalist();
-start();
+bootstrap();
 
 function wireCourseOverlay() {
   $('#courseCancel').addEventListener('click', closeCourseSheet);
