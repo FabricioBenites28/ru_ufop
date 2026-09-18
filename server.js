@@ -25,6 +25,7 @@ const MENU_EDITOR_EMAIL = (process.env.MENU_EDITOR_EMAIL || 'carlos.rodriguez@al
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 const MAX_AGE = 24 * 60 * 60 * 1000;
 const REDIS_KEY = 'ru:data';
+const APP_TZ = process.env.APP_TZ || 'America/Sao_Paulo';
 
 const app = express();
 const PUBLIC = path.join(__dirname, 'public');
@@ -267,10 +268,24 @@ function arrivalInfo(body) {
   };
 }
 
+function startOfToday() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TZ,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const p = {};
+  for (const part of parts) p[part.type] = part.value;
+  const hour = p.hour === '24' ? '00' : p.hour;
+  const wall = Date.UTC(+p.year, +p.month - 1, +p.day, +hour, +p.minute, +p.second);
+  const offset = wall - now.getTime();
+  return Date.UTC(+p.year, +p.month - 1, +p.day) - offset;
+}
+
 function purgeExpiredAnnouncements() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const cutoff = d.getTime();
+  const cutoff = startOfToday();
   const before = db.announcements.length;
   db.announcements = db.announcements.filter((a) => new Date(a.arrive).getTime() >= cutoff);
   return db.announcements.length !== before;
