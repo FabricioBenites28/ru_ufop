@@ -297,6 +297,7 @@ app.post('/api/menu', requireAuth, (req, res, next) => {
           text: String(i.text || '').trim().slice(0, 80),
           veg: !!i.veg,
           lactose: !!i.lactose,
+          aviso: !!i.aviso,
         }))
         .filter((i) => i.text)
     : [];
@@ -376,12 +377,14 @@ app.get('/api/me', requireAuth, (req, res) => {
 app.post('/api/me', requireAuth, async (req, res) => {
   const course = String(req.body.course || '').trim().slice(0, 80);
   if (!course) return res.status(400).json({ error: 'informe seu curso' });
+  let photo = String(req.body.photo || '').trim().slice(0, 400000);
+  if (photo && !photo.startsWith('data:image/')) photo = '';
   const u = db.users[req.user.sub] || {};
   db.users[req.user.sub] = {
     sub: req.user.sub,
     email: req.user.email,
     name: req.user.name,
-    photo: u.photo || '',
+    photo: photo || u.photo || '',
     course,
     updatedAt: new Date().toISOString(),
   };

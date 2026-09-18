@@ -15,24 +15,23 @@ const state = {
   exact: '19:00',
   menuTab: null,
   pendingMenu: null,
+  pendingPhoto: '',
 };
 
 const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
 
 const COURSES = [
-  'Ciência da Computação', 'Engenharia de Computação', 'Engenharia de Software',
-  'Sistemas de Informação', 'Engenharia de Controle e Automação',
-  'Engenharia Civil', 'Engenharia de Minas', 'Engenharia Mecânica', 'Engenharia de Produção',
-  'Engenharia Elétrica', 'Engenharia de Computação', 'Engenharia de Telecomunicações',
-  'Arquitetura e Urbanismo', 'Design de Produto', 'Farmácia', 'Medicina', 'Enfermagem',
-  'Nutrição', 'Educação Física', 'Odontologia', 'Direito', 'Economia',
-  'Administração', 'Ciências Contábeis', 'Jornalismo', 'Letras', 'História',
-  'Filosofia', 'Geografia', 'Pedagogia', 'Psicologia', 'Ciências Biológicas',
-  'Física', 'Química', 'Matemática', 'Estatística', 'Música', 'Turismo',
-  'Serviço Social', 'Outro curso',
+  'Arquitetura e Urbanismo', 'Artes Escénicas', 'Ciencia de la Computación',
+  'Ciencia y Tecnología de Alimentos', 'Ciencias Biológicas', 'Derecho',
+  'Educación Física', 'Estadística y Ciencia de Datos', 'Farmacia', 'Filosofía',
+  'Física', 'Ingeniería Ambiental', 'Ingeniería Civil',
+  'Ingeniería de Control y Automatización', 'Ingeniería de Minas',
+  'Ingeniería de Producción', 'Ingeniería Geológica', 'Ingeniería Mecánica',
+  'Ingeniería Metalúrgica', 'Ingeniería Urbana', 'Inteligencia Artificial',
+  'Matemática', 'Medicina', 'Museología', 'Música', 'Nutrición', 'Química',
+  'Química Industrial', 'Turismo',
 ];
-const COURSE_OPTIONS = COURSES.map((c) => `<option value="${c}"></option>`).join('');
-const COURSE_OPTION_ITEMS = COURSES.map((c) => `${c}`).join('|');
+const COURSE_OPTIONS = COURSES.map((c) => `<option value="${c}">${c}</option>`).join('');
 
 function authHeaders() {
   const headers = { 'Content-Type': 'application/json' };
@@ -49,7 +48,19 @@ function applyProfile(p) {
   localStorage.setItem('ru_email', state.email);
   localStorage.setItem('ru_photo', state.photo);
   localStorage.setItem('ru_course', state.course);
+  const pb = $('#profileBtn');
+  pb.textContent = '';
+  if (state.photo) {
+    const img = document.createElement('img');
+    img.src = state.photo;
+    img.alt = 'perfil';
+    pb.appendChild(img);
+  } else {
+    pb.textContent = '👤';
+  }
+  pb.classList.remove('hidden');
   $('#logoutBtn').classList.remove('hidden');
+  $('#announceBtn').classList.remove('hidden');
   $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
 }
 
@@ -73,6 +84,8 @@ function openLogin() {
   state.photo = '';
   state.course = '';
   $('#logoutBtn').classList.add('hidden');
+  $('#profileBtn').classList.add('hidden');
+  $('#announceBtn').classList.add('hidden');
   $('#emailOverlay').classList.remove('hidden');
   $('#gButton').innerHTML = '';
   $('#authError').classList.add('hidden');
@@ -297,7 +310,6 @@ function start() {
   $('#confirmBtn').addEventListener('click', confirmAnnounce);
   $('#exactTime').addEventListener('change', (e) => { state.exact = e.target.value; syncModal(); });
 
-  $('#detectBtn').addEventListener('click', refreshMenuPreview);
   $('#mealSelect').addEventListener('change', refreshMenuPreview);
   $('#menuText').addEventListener('input', refreshMenuPreview);
   $('#menuCancel').addEventListener('click', closeMenuModal);
@@ -341,13 +353,17 @@ function parseMenuText(raw) {
   const items = [];
   for (const line of lines) {
     if (/card[aá]pio\s+do\s+(alm[oô]ço|jantar)/i.test(line)) continue;
-    if (/cont[eé]m\s*lactose/i.test(line)) continue;
-    const clean = line.replace(/^[•\-\*\s]+/, '').replace(/\s+/g, ' ').trim();
+    const aviso = /\*/g.test(line);
+    const clean = line
+      .replace(/^[•\-\*\s]+/, '')
+      .replace(/[*]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!clean) continue;
     items.push({
-      text: clean.replace(/\*+/g, '').trim(),
+      text: clean,
       veg: /vegetariano/i.test(clean),
-      lactose: /\*/.test(clean) || /lactose/i.test(clean),
+      aviso,
     });
   }
   return { meal, date, dateLabel, items };
@@ -360,7 +376,13 @@ function tagify(li, item) {
     s.textContent = 'vegetariano';
     li.appendChild(s);
   }
-  if (item.lactose) {
+  if (item.aviso) {
+    li.classList.add('aviso-line');
+    const s = document.createElement('span');
+    s.className = 'tag aviso';
+    s.textContent = '⚠ aviso';
+    li.appendChild(s);
+  } else if (item.lactose) {
     const s = document.createElement('span');
     s.className = 'tag lac';
     s.textContent = 'lactose';
@@ -617,11 +639,12 @@ async function bootstrap() {
 }
 
 function fillCourseDatalist() {
-  const el = $('#courseOptions');
-  el.innerHTML = COURSE_OPTIONS;
+  const el = $('#courseInput');
+  el.innerHTML = `<option value="">Escolha seu curso…</option>${COURSE_OPTIONS}`;
 }
 
 function openCourseSheet(required) {
+  state.pendingPhoto = '';
   const ov = $('#courseOverlay');
   const photo = $('#coursePhoto');
   if (state.photo) {
@@ -635,9 +658,8 @@ function openCourseSheet(required) {
   $('#courseName').textContent = state.name;
   $('#courseMsg').textContent = required
     ? 'Conta pra gente seu curso pra confirmar. 🎓'
-    : 'Atualize seu curso quando quiser.';
-  $('#courseInput').value = state.course;
-  $('#courseInput').setAttribute('list', 'courseOptions');
+    : 'Seu perfil: mude a foto ou o curso quando quiser.';
+  $('#courseInput').value = COURSES.includes(state.course) ? state.course : '';
   $('#courseError').classList.add('hidden');
   ov.classList.remove('hidden');
   $('#courseInput').focus();
@@ -662,7 +684,7 @@ async function saveCourse() {
     const resp = await fetch('/api/me', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ course }),
+      body: JSON.stringify({ course, photo: state.pendingPhoto || state.photo }),
     });
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
@@ -679,6 +701,31 @@ async function saveCourse() {
 
 $('#courseCancel').addEventListener('click', closeCourseSheet);
 $('#courseSave').addEventListener('click', saveCourse);
+$('#profileBtn').addEventListener('click', () => openCourseSheet(false));
+$('#coursePhotoBtn').addEventListener('click', () => $('#coursePhotoFile').click());
+$('#coursePhotoFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = () => {
+    img.onload = () => {
+      const size = 160;
+      const canvas = document.createElement('canvas');
+      const scale = Math.max(1, img.width / size, img.height / size);
+      canvas.width = Math.round(img.width / scale);
+      canvas.height = Math.round(img.height / scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      state.pendingPhoto = canvas.toDataURL('image/jpeg', 0.85);
+      $('#coursePhoto').src = state.pendingPhoto;
+      $('#coursePhoto').classList.remove('hidden');
+      $('#coursePhotoFbk').classList.add('hidden');
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
 
 fillCourseDatalist();
 bootstrap();

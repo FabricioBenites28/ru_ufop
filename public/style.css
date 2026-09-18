@@ -134,6 +134,26 @@ header {
 }
 .link-btn:hover { color: var(--text); background: var(--surface-2); }
 
+.avatar-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  padding: 0;
+  transition: transform .15s ease, border-color .15s ease;
+}
+.avatar-btn:hover { border-color: var(--green); }
+.avatar-btn:active { transform: scale(.94); }
+.avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+
 main {
   max-width: 620px;
   margin: 0 auto;
@@ -466,9 +486,23 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .7; }
   box-shadow: 0 12px 28px rgba(163, 230, 53, .3);
 }
 
+.auth-photo {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  object-fit: cover;
+  border: 2px solid var(--line);
+  display: block;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .4);
+}
+
+.auth .ghost.wide { margin-top: -4px; }
+
 .auth h1 { font-size: 21px; margin: 0 0 6px; font-weight: 900; }
 .auth .sub { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0 0 20px; font-weight: 700; }
 .auth input { margin-bottom: 12px; text-align: center; }
+.auth select { margin-bottom: 12px; }
 
 #gButton { display: flex; justify-content: center; }
 
@@ -575,6 +609,9 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .7; }
 
 .tag.veg { background: var(--soft); color: var(--green); }
 .tag.lac { background: rgba(251, 113, 133, .12); color: var(--red); }
+.tag.aviso { background: rgba(251, 191, 36, .14); color: var(--amber); }
+
+.menu-items li.aviso-line { color: var(--amber); font-weight: 800; }
 
 .empty-menu { text-align: center; padding: 24px; }
 .empty-menu .menu-title { margin-bottom: 6px; }
