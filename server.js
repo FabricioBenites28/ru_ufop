@@ -243,11 +243,15 @@ app.get('/api/announcements', (req, res) => {
   res.json(list);
 });
 
+function profileOf(email, sub) {
+  return db.users[email] || db.users[sub] || {};
+}
+
 app.post('/api/announce', requireAuth, async (req, res) => {
   const email = req.user.email;
   const info = arrivalInfo(req.body);
   if (!info) return res.status(400).json({ error: 'horário inválido' });
-  const userId = req.user.sub;
+  const userId = req.user.email;
   const now = Date.now();
   db.announcements = db.announcements.filter(
     (a) =>
@@ -255,7 +259,7 @@ app.post('/api/announce', requireAuth, async (req, res) => {
       (a.userId !== userId || new Date(a.arrive).getTime() <= now)
   );
   const name = req.user.name || nameFromEmail(email);
-  const profile = db.users[userId] || {};
+  const profile = profileOf(email, req.user.sub);
   const announcement = {
     id: crypto.randomUUID(),
     userId,
@@ -349,29 +353,31 @@ app.post('/api/auth/google', async (req, res) => {
     return res.status(401).json({ error: 'a verificação do Google falhou' });
   }
   if (!user) return res.status(401).json({ error: 'use sua conta @aluno.ufop.edu.br' });
-  const existing = db.users[user.sub] || {};
-  db.users[user.sub] = {
+  const legacy = db.users[user.sub] || {};
+  const existing = profileOf(user.email, user.sub);
+  db.users[user.email] = {
     sub: user.sub,
     email: user.email,
     name: user.name,
-    photo: user.photo || existing.photo || '',
-    course: existing.course || '',
+    photo: user.photo || existing.photo || legacy.photo || '',
+    course: existing.course || legacy.course || '',
     updatedAt: new Date().toISOString(),
   };
+  if (db.users[user.sub] && user.sub !== user.email) delete db.users[user.sub];
   await save();
   res.json({
     token: signSession(user),
     email: user.email,
     name: user.name,
-    photo: db.users[user.sub].photo,
-    course: db.users[user.sub].course,
-    needsCourse: !db.users[user.sub].course,
+    photo: db.users[user.email].photo,
+    course: db.users[user.email].course,
+    needsCourse: !db.users[user.email].course,
   });
 });
 
 app.get('/api/me', requireAuth, (req, res) => {
-  const u = db.users[req.user.sub] || { sub: req.user.sub, email: req.user.email, name: req.user.name, photo: '', course: '' };
-  res.json({ email: u.email, name: u.name, photo: u.photo || '', course: u.course || '' });
+  const u = profileOf(req.user.email, req.user.sub);
+  res.json({ email: u.email || req.user.email, name: u.name || req.user.name, photo: u.photo || '', course: u.course || '' });
 });
 
 app.post('/api/me', requireAuth, async (req, res) => {
@@ -379,8 +385,8 @@ app.post('/api/me', requireAuth, async (req, res) => {
   if (!course) return res.status(400).json({ error: 'informe seu curso' });
   let photo = String(req.body.photo || '').trim().slice(0, 400000);
   if (photo && !photo.startsWith('data:image/')) photo = '';
-  const u = db.users[req.user.sub] || {};
-  db.users[req.user.sub] = {
+  const u = profileOf(req.user.email, req.user.sub);
+  db.users[req.user.email] = {
     sub: req.user.sub,
     email: req.user.email,
     name: req.user.name,
@@ -389,7 +395,7 @@ app.post('/api/me', requireAuth, async (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   await save();
-  res.json(db.users[req.user.sub]);
+  res.json(db.users[req.user.email]);
 });
 
 loadData().then(() => {
