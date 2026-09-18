@@ -12,6 +12,7 @@ const SECRET_FILE = path.join(__dirname, '.session-secret');
 const SESSION_DAYS = 30;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const MENU_EDITOR_EMAIL = (process.env.MENU_EDITOR_EMAIL || 'carlos.rodriguez@aluno.ufop.edu.br').toLowerCase();
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 const MAX_AGE = 24 * 60 * 60 * 1000;
 const REDIS_KEY = 'ru:data';
@@ -248,7 +249,12 @@ app.get('/api/menu', (req, res) => {
   res.json(menus);
 });
 
-app.post('/api/menu', requireAuth, async (req, res) => {
+app.post('/api/menu', requireAuth, (req, res, next) => {
+  if (req.user.email !== MENU_EDITOR_EMAIL) {
+    return res.status(403).json({ error: 'só o editor do cardápio pode alterar' });
+  }
+  next();
+}, async (req, res) => {
   const email = req.user.email;
   const meal = String(req.body.meal || '');
   if (!['almoço', 'jantar'].includes(meal)) return res.status(400).json({ error: 'refeição inválida' });

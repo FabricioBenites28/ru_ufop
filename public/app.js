@@ -3,16 +3,20 @@ const $ = (s) => document.querySelector(s);
 const MODAL_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120];
 const DAYS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 const WEEKDAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+const MENU_EDITOR_EMAIL = 'carlos.rodriguez@aluno.ufop.edu.br';
 
 const state = {
   session: localStorage.getItem('ru_session') || '',
   name: localStorage.getItem('ru_name') || '',
+  email: localStorage.getItem('ru_email') || '',
   mode: 'in',
   minutes: 30,
   exact: '19:00',
   menuTab: null,
   pendingMenu: null,
 };
+
+const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
 
 function authHeaders(extra = {}) {
   const headers = { 'Content-Type': 'application/json', ...extra };
@@ -23,6 +27,7 @@ function authHeaders(extra = {}) {
 function logout() {
   localStorage.removeItem('ru_session');
   localStorage.removeItem('ru_name');
+  localStorage.removeItem('ru_email');
   location.reload();
 }
 
@@ -391,11 +396,14 @@ async function renderMenu() {
     const sub = document.createElement('p');
     sub.className = 'sub';
     sub.textContent = 'O cardápio de hoje vem do Telegram. Dá pra colar aqui pra todo mundo ver.';
-    const btn = document.createElement('button');
-    btn.className = 'primary';
-    btn.textContent = 'Adicionar cardápio';
-    btn.onclick = () => openMenuModal(nowMeal());
-    card.append(title, sub, btn);
+    card.append(title, sub);
+    if (canEditMenu()) {
+      const btn = document.createElement('button');
+      btn.className = 'primary';
+      btn.textContent = 'Adicionar cardápio';
+      btn.onclick = () => openMenuModal(nowMeal());
+      card.appendChild(btn);
+    }
     container.appendChild(card);
     return;
   }
@@ -423,12 +431,16 @@ async function renderMenu() {
   const any = almoço || jantar;
   date.textContent = any ? any.dateLabel : day;
   titles.append(title, date);
-  const editBtn = document.createElement('button');
-  editBtn.className = 'menu-edit';
-  editBtn.textContent = '✏️';
-  editBtn.title = 'Editar cardápio';
-  editBtn.onclick = () => openMenuModal(current ? current.meal : null);
-  head.append(titles, editBtn);
+  if (canEditMenu()) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'menu-edit';
+    editBtn.textContent = '✏️';
+    editBtn.title = 'Editar cardápio';
+    editBtn.onclick = () => openMenuModal(current ? current.meal : null);
+    head.append(titles, editBtn);
+  } else {
+    head.appendChild(titles);
+  }
   card.appendChild(head);
 
   const tabs = document.createElement('div');
@@ -490,7 +502,7 @@ async function initGoogle() {
     callback: handleCredential,
   });
   google.accounts.id.renderButton(document.getElementById('gButton'), {
-    theme: 'outline',
+    theme: 'filled_black',
     size: 'large',
     shape: 'pill',
     text: 'continue_with',
@@ -514,8 +526,10 @@ async function handleCredential(response) {
     const data = await resp.json();
     state.session = data.token;
     state.name = data.name;
+    state.email = data.email;
     localStorage.setItem('ru_session', data.token);
     localStorage.setItem('ru_name', data.name);
+    localStorage.setItem('ru_email', data.email);
     $('.brand-sub').textContent = `oi, ${data.name.split(' ')[0]} 👋`;
     $('#emailOverlay').classList.add('hidden');
     start();
