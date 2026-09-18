@@ -49,6 +49,7 @@ function applyProfile(p) {
   localStorage.setItem('ru_email', state.email);
   localStorage.setItem('ru_photo', state.photo);
   localStorage.setItem('ru_course', state.course);
+  $('#logoutBtn').classList.remove('hidden');
   $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
 }
 
@@ -66,30 +67,15 @@ function logout() {
 }
 
 function openLogin() {
-  state.started = false;
   state.session = '';
   state.name = '';
   state.email = '';
   state.photo = '';
   state.course = '';
+  $('#logoutBtn').classList.add('hidden');
   $('#emailOverlay').classList.remove('hidden');
   $('#gButton').innerHTML = '';
   $('#authError').classList.add('hidden');
-  initGoogle();
-}
-
-function openLogin() {
-  state.started = false;
-  $('#emailOverlay').classList.remove('hidden');
-  $('#authError').classList.add('hidden');
-  start();
-  initGoogle();
-}
-
-function openLogin() {
-  $('#authError').classList.add('hidden');
-  $('#emailOverlay').classList.remove('hidden');
-  wireLogin();
   initGoogle();
 }
 
@@ -316,7 +302,7 @@ function start() {
   $('#menuText').addEventListener('input', refreshMenuPreview);
   $('#menuCancel').addEventListener('click', closeMenuModal);
   $('#menuSave').addEventListener('click', saveMenu);
-  $('#logoutBtn').addEventListener('click', logoutoddTrash);
+  $('#logoutBtn').addEventListener('click', logout);
 
   setInterval(renderTimeline, 30000);
   document.addEventListener('visibilitychange', () => {
@@ -642,7 +628,6 @@ function openCourseSheet(required) {
     photo.src = state.photo;
     photo.classList.remove('hidden');
     $('#coursePhotoFbk').classList.add('hidden');
-    $('#courseFill' )
   } else {
     photo.classList.add('hidden');
     $('#coursePhotoFbk').classList.remove('hidden');
@@ -695,14 +680,5 @@ async function saveCourse() {
 $('#courseCancel').addEventListener('click', closeCourseSheet);
 $('#courseSave').addEventListener('click', saveCourse);
 
+fillCourseDatalist();
 bootstrap();
-
-function wireCourseOverlay() {
-  $('#courseCancel').addEventListener('click', closeCourseSheet);
-  $('#courseSave').addEventListener('click', saveCourse);
-}
-
-function fillCourseDatalist() {
-  const el = $('#courseOptions');
-  el.innerHTML = COURSE_OPTIONS;
-}

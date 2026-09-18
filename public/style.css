@@ -3,6 +3,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.hidden { display: none !important; }
+
 :root {
   --bg: #0b1210;
   --bg-2: #0e1814;

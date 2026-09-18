@@ -20,12 +20,30 @@ const REDIS_KEY = 'ru:data';
 const app = express();
 const PUBLIC = path.join(__dirname, 'public');
 app.use(express.json());
+
+function assetVersion(name) {
+  try {
+    return crypto.createHash('md5').update(fs.readFileSync(path.join(PUBLIC, name))).digest('hex').slice(0, 10);
+  } catch {
+    return 'dev';
+  }
+}
+
+let INDEX_HTML = '';
+function buildIndex() {
+  let html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
+  html = html.replace('/app.js?v=res', `/app.js?v=${assetVersion('app.js')}`);
+  html = html.replace('/style.css?v=7', `/style.css?v=${assetVersion('style.css')}`);
+  INDEX_HTML = html;
+}
+buildIndex();
+
 const noCache = (req, res, next) => {
   res.setHeader('Cache-Control', 'no-cache');
   next();
 };
-app.get('/', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
-app.get('/index.html', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
+app.get('/', noCache, (req, res) => res.send(INDEX_HTML));
+app.get('/index.html', noCache, (req, res) => res.send(INDEX_HTML));
 app.get('/sw.js', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'sw.js')));
 app.get('/manifest.json', noCache, (req, res) => res.sendFile(path.join(PUBLIC, 'manifest.json')));
 app.use(express.static(PUBLIC));
