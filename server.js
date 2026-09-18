@@ -5,6 +5,14 @@ const crypto = require('crypto');
 const webpush = require('web-push');
 const { OAuth2Client } = require('google-auth-library');
 
+try {
+  const env = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+  for (const line of env.split(/\r?\n/)) {
+    const m = line.match(/^([A-Za-z_][\w]*)\s*=\s*(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+  }
+} catch {}
+
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
 const VAPID_FILE = path.join(__dirname, '.vapid.json');

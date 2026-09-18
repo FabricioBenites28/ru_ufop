@@ -3,3 +3,4 @@ data.json
 .vapid.json
 .session-secret
 *.log
+.env
