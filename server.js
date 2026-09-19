@@ -526,6 +526,18 @@ app.get('/api/vapid', (req, res) => {
   res.json({ publicKey: vapid.publicKey });
 });
 
+app.post('/api/test-push', requireAuth, (req, res) => {
+  const count = db.subscriptions.filter((s) => s.email === req.user.email).length;
+  if (count > 0) {
+    try {
+      sendPushToEmails([req.user.email], '🔔 RU UFOP', 'Suas notificações estão funcionando!');
+    } catch (err) {
+      return res.status(500).json({ error: String(err && err.message || err) });
+    }
+  }
+  res.json({ sent: count });
+});
+
 app.get('/api/config', (req, res) => {
   res.json({ googleClientId: GOOGLE_CLIENT_ID });
 });

@@ -182,6 +182,7 @@ header {
 .link-btn:hover { color: var(--text); background: var(--surface-2); }
 
 .avatar-btn {
+  position: relative;
   width: 38px;
   height: 38px;
   border-radius: 50%;
@@ -200,6 +201,23 @@ header {
 .avatar-btn:hover { border-color: var(--primary); }
 .avatar-btn:active { transform: scale(.95); }
 .avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+
+.notif-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--surface);
+  animation: dot-pulse 1.8s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .3; }
+}
+.notif-dot.hidden { display: none; }
 
 /* ===================== layout ===================== */
 

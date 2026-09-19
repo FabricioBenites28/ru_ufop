@@ -156,6 +156,10 @@ function isStandaloneApp() {
     window.matchMedia('(display-mode: standalone)').matches;
 }
 
+function canPush() {
+  return 'Notification' in window && 'serviceWorker' in navigator;
+}
+
 function openNotifs() {
   $('#notifOverlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -170,7 +174,11 @@ function closeNotifs() {
 function renderNotifState() {
   const hint = $('#notifHint');
   const btn = $('#notifEnable');
+  const test = $('#notifTest');
+  const dot = $('#notifDot');
   hint.classList.add('hidden');
+  test.classList.add('hidden');
+  dot.classList.add('hidden');
   btn.classList.remove('hidden');
   btn.textContent = 'Ativar notificações';
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
@@ -181,6 +189,7 @@ function renderNotifState() {
   if (Notification.permission === 'granted') {
     $('#notifStatus').textContent = 'Notificações ativas neste navegador. ✔';
     btn.textContent = 'Verificar / atualizar inscrição';
+    test.classList.remove('hidden');
   } else if (Notification.permission === 'denied') {
     $('#notifStatus').textContent = 'Notificações bloqueadas neste navegador.';
     hint.textContent = 'Libere as notificações nas configurações do navegador (ícone de cadeado 🔒 ao lado do endereço) e volte aqui para ativar.';
@@ -188,6 +197,7 @@ function renderNotifState() {
     return;
   } else {
     $('#notifStatus').textContent = 'Ative para receber cardápio, pedidos de amizade e amigos indo ao RU.';
+    if (canPush()) dot.classList.remove('hidden');
   }
   if (!isIOS()) return;
   if (!isStandaloneApp()) {
@@ -208,14 +218,16 @@ async function enableNotifs() {
   btn.disabled = true;
   const old = btn.textContent;
   btn.textContent = 'Ativando…';
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') {
+    renderNotifState();
+    toast('Permissão não concedida.');
+    btn.disabled = false;
+    btn.textContent = old;
+    return;
+  }
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') {
-      renderNotifState();
-      toast('Permissão não concedida.');
-      return;
-    }
     const { publicKey } = await (await fetch('/api/vapid')).json();
     let sub = await reg.pushManager.getSubscription();
     if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
@@ -237,14 +249,33 @@ async function enableNotifs() {
       });
     }
     toast('Notificações ativadas! 🔔');
-    renderNotifState();
   } catch (err) {
     console.error('push falhou:', err);
     toast('Não foi possível ativar. Veja a dica.');
-    renderNotifState();
   }
+  renderNotifState();
   btn.disabled = false;
   btn.textContent = old;
+}
+
+async function sendTestPush() {
+  const btn = $('#notifTest');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  try {
+    const resp = await fetch('/api/test-push', { method: 'POST', headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    const j = await resp.json();
+    if (j.sent > 0) {
+      toast('Notificação de teste enviada! 🔔 Confira seu celular.');
+    } else {
+      toast('Sem inscrição de push neste usuário. Toque em Ativar.');
+    }
+  } catch {
+    toast('Falha ao enviar teste.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Enviar notificação de teste';
 }
 
 function dayLabel(iso) {
@@ -519,6 +550,7 @@ function start() {
   $('#notifBtn').addEventListener('click', openNotifs);
   $('#notifClose').addEventListener('click', closeNotifs);
   $('#notifEnable').addEventListener('click', enableNotifs);
+  $('#notifTest').addEventListener('click', sendTestPush);
 
   $('#friendsBtn').addEventListener('click', openFriends);
   $('#friendsClose').addEventListener('click', closeFriends);
