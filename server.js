@@ -71,8 +71,14 @@ let db = { announcements: [], menus: [], subscriptions: [], users: {} };
 
 function normalizeDb() {
   if (!Array.isArray(db.announcements)) db.announcements = [];
+  else db.announcements = db.announcements.filter((a) => a && typeof a === 'object' && a.id);
+  for (const a of db.announcements) {
+    a.joins = Array.isArray(a.joins) ? a.joins.filter((j) => j && j.email) : [];
+  }
   if (!Array.isArray(db.menus)) db.menus = [];
   if (!Array.isArray(db.subscriptions)) db.subscriptions = [];
+  else db.subscriptions = db.subscriptions.filter((s) => s && typeof s === 'object' && s.endpoint);
+  for (const s of db.subscriptions) s.email = String(s.email || '').trim().toLowerCase().slice(0, 80);
   if (!db.users || typeof db.users !== 'object') db.users = {};
   for (const k of Object.keys(db.users)) {
     const u = db.users[k];
@@ -153,10 +159,9 @@ function loadVapid() {
 const vapid = loadVapid();
 webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
 
-function sendPush(title, body) {
-  const payload = JSON.stringify({ title, body });
+function sendNotifications(subs, payload) {
   const dead = [];
-  const jobs = db.subscriptions.map((sub) =>
+  const jobs = subs.map((sub) =>
     webpush
       .sendNotification(sub, payload)
       .catch((err) => {
@@ -165,10 +170,26 @@ function sendPush(title, body) {
   );
   Promise.all(jobs).then(async () => {
     if (dead.length) {
-      db.subscriptions = db.subscriptions.filter((s) => !dead.includes(s));
+      const deadSet = new Set(dead);
+      db.subscriptions = db.subscriptions.filter((s) => !deadSet.has(s));
       await save();
     }
   });
+}
+
+function sendPush(title, body) {
+  sendNotifications(db.subscriptions, JSON.stringify({ title, body }));
+}
+
+function sendPushToEmails(emails, title, body) {
+  const set = new Set((emails || []).map((e) => String(e).trim().toLowerCase()));
+  const subs = db.subscriptions.filter((s) => set.has(s.email));
+  if (subs.length) sendNotifications(subs, JSON.stringify({ title, body }));
+}
+
+function friendsOfEmail(email) {
+  const u = db.users[email];
+  return u && Array.isArray(u.friends) ? u.friends : [];
 }
 
 const EMAIL_RE = /^[a-z0-9._%+\-]+@(?:aluno\.)?ufop\.edu\.br$/i;
@@ -384,7 +405,7 @@ app.post('/api/announce', requireAuth, async (req, res) => {
   };
   db.announcements.push(announcement);
   await save();
-  sendPush(name, `Vai comer no RU ${info.label}`);
+  sendPushToEmails(friendsOfEmail(email), name, `Vai comer no RU ${info.label}`);
   res.json(announcement);
 });
 
@@ -404,8 +425,42 @@ app.put('/api/announce/:id', requireAuth, async (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   await save();
-  sendPush(name, `Atualizou o horário: vai comer no RU ${info.label}`);
+  sendPushToEmails(friendsOfEmail(email), name, `Atualizou o horário: vai comer no RU ${info.label}`);
   res.json(db.announcements[idx]);
+});
+
+app.post('/api/announce/:id/join', requireAuth, async (req, res) => {
+  const ann = db.announcements.find((a) => a.id === req.params.id);
+  if (!ann) return res.status(404).json({ error: 'aviso não encontrado' });
+  if (new Date(ann.arrive).getTime() <= Date.now()) {
+    return res.status(400).json({ error: 'esse aviso já passou' });
+  }
+  ann.joins = Array.isArray(ann.joins) ? ann.joins : [];
+  const already = ann.joins.some((j) => j.email === req.user.email);
+  if (!already && ann.email !== req.user.email) {
+    const profile = profileOf(req.user.email, req.user.sub);
+    ann.joins.push({
+      email: req.user.email,
+      name: req.user.name || profile.name || nameFromEmail(req.user.email),
+      photo: profile.photo || '',
+      course: profile.course || '',
+      joinedAt: new Date().toISOString(),
+    });
+    await save();
+    if (ann.email) {
+      sendPushToEmails([ann.email], req.user.name || nameFromEmail(req.user.email), `Vai junto com você: ${ann.label}`);
+    }
+  }
+  res.json(ann);
+});
+
+app.delete('/api/announce/:id/join', requireAuth, async (req, res) => {
+  const ann = db.announcements.find((a) => a.id === req.params.id);
+  if (!ann) return res.status(404).json({ error: 'aviso não encontrado' });
+  ann.joins = Array.isArray(ann.joins) ? ann.joins : [];
+  ann.joins = ann.joins.filter((j) => j.email !== req.user.email);
+  await save();
+  res.json(ann);
 });
 
 app.get('/api/menu', (req, res) => {
@@ -455,10 +510,12 @@ app.post('/api/menu', requireAuth, (req, res, next) => {
 app.post('/api/subscribe', async (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'assinatura inválida' });
-  if (!db.subscriptions.some((s) => s.endpoint === sub.endpoint)) {
-    db.subscriptions.push(sub);
-    await save();
-  }
+  const email = String(sub.email || '').trim().toLowerCase().slice(0, 80);
+  const entry = { ...sub, email };
+  const i = db.subscriptions.findIndex((s) => s.endpoint === sub.endpoint);
+  if (i === -1) db.subscriptions.push(entry);
+  else db.subscriptions[i] = entry;
+  await save();
   res.json({ ok: true });
 });
 
@@ -573,11 +630,13 @@ app.post('/api/friends', requireAuth, async (req, res) => {
     target.outgoing = target.outgoing.filter((e) => e !== me.email);
     if (!target.friends.includes(me.email)) target.friends.push(me.email);
     await save();
+    sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'aceitou seu pedido de amizade');
     return res.json({ ok: true, state: 'friend' });
   }
   me.outgoing.push(email);
   if (!target.incoming.includes(me.email)) target.incoming.push(me.email);
   await save();
+  sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'te mandou um pedido de amizade');
   res.json({ ok: true, state: 'outgoing' });
 });
 
@@ -592,6 +651,7 @@ app.post('/api/friends/accept', requireAuth, async (req, res) => {
   target.outgoing = target.outgoing.filter((e) => e !== me.email);
   if (!target.friends.includes(me.email)) target.friends.push(me.email);
   await save();
+  sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'aceitou seu pedido de amizade');
   res.json({ ok: true, state: 'friend' });
 });
 

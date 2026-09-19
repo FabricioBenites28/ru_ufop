@@ -29,6 +29,7 @@
       </div>
     </div>
     <span id="status" class="badge"></span>
+    <button id="notifBtn" class="avatar-btn" title="Notificações">🔔</button>
     <button id="friendsBtn" class="avatar-btn hidden" title="Amigos">👥</button>
     <button id="profileBtn" class="avatar-btn hidden" title="Meu perfil">👤</button>
     <button id="logoutBtn" class="link-btn hidden" title="Trocar de conta">sair</button>
@@ -147,6 +148,25 @@
       <div id="friendSections" class="friend-sections"></div>
       <div class="actions">
         <button id="friendsClose" class="ghost wide">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notifOverlay" class="overlay center hidden">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2>🔔 Notificações</h2>
+      <p id="notifStatus" class="sub"></p>
+      <ul id="notifList" class="notif-list">
+        <li>🍽️ Cardápio do dia publicado</li>
+        <li>👥 Alguém te manda um pedido de amizade</li>
+        <li>⏰ Um amigo anuncia que vai ao RU</li>
+        <li>🤝 Alguém se une a um aviso seu</li>
+      </ul>
+      <button id="notifEnable" class="primary wide">Ativar notificações</button>
+      <div id="notifHint" class="hint hidden"></div>
+      <div class="actions">
+        <button id="notifClose" class="ghost wide">Fechar</button>
       </div>
     </div>
   </div>

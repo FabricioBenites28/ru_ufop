@@ -125,11 +125,10 @@ function setStatus(ok) {
 
 async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') return;
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
     const { publicKey } = await (await fetch('/api/vapid')).json();
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') return;
     let sub = await reg.pushManager.getSubscription();
     if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
       await sub.unsubscribe();
@@ -146,12 +145,112 @@ async function enablePush() {
       await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub),
+        body: JSON.stringify({ ...sub.toJSON(), email: state.email || '' }),
       });
     }
   } catch (err) {
     console.error('push falhou:', err);
   }
+}
+
+function isIOS() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+function isStandaloneApp() {
+  return (typeof navigator.standalone !== 'undefined' && navigator.standalone === true) ||
+    window.matchMedia('(display-mode: standalone)').matches;
+}
+
+function openNotifs() {
+  $('#notifOverlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  renderNotifState();
+}
+
+function closeNotifs() {
+  $('#notifOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function renderNotifState() {
+  const hint = $('#notifHint');
+  const btn = $('#notifEnable');
+  hint.classList.add('hidden');
+  btn.classList.remove('hidden');
+  btn.textContent = 'Ativar notificações';
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    $('#notifStatus').textContent = 'Seu navegador não suporta notificações.';
+    btn.classList.add('hidden');
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    $('#notifStatus').textContent = 'Notificações ativas neste navegador. ✔';
+    btn.textContent = 'Verificar / atualizar inscrição';
+  } else if (Notification.permission === 'denied') {
+    $('#notifStatus').textContent = 'Notificações bloqueadas neste navegador.';
+    hint.textContent = 'Libere as notificações nas configurações do navegador (ícone de cadeado 🔒 ao lado do endereço) e volte aqui para ativar.';
+    hint.classList.remove('hidden');
+    return;
+  } else {
+    $('#notifStatus').textContent = 'Ative para receber cardápio, pedidos de amizade e amigos indo ao RU.';
+  }
+  if (!isIOS()) return;
+  if (!isStandaloneApp()) {
+    hint.textContent = 'No iPhone/iPad o Safari só envia notificações em apps instalados: toque em Compartilhar ➜ “Adicionar à Tela de Início”, abra o app instalado e ative aqui.';
+    hint.classList.remove('hidden');
+  } else {
+    hint.textContent = 'App instalado! Toque em “Ativar notificações” e permita.';
+    hint.classList.remove('hidden');
+  }
+}
+
+async function enableNotifs() {
+  const btn = $('#notifEnable');
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    toast('Seu navegador não suporta notificações.');
+    return;
+  }
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = 'Ativando…';
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      renderNotifState();
+      toast('Permissão não concedida.');
+      return;
+    }
+    const { publicKey } = await (await fetch('/api/vapid')).json();
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
+      await sub.unsubscribe();
+      sub = null;
+    }
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      localStorage.setItem('ru_vapid', publicKey);
+    }
+    if (sub) {
+      await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...sub.toJSON(), email: state.email || '' }),
+      });
+    }
+    toast('Notificações ativadas! 🔔');
+    renderNotifState();
+  } catch (err) {
+    console.error('push falhou:', err);
+    toast('Não foi possível ativar. Veja a dica.');
+    renderNotifState();
+  }
+  btn.disabled = false;
+  btn.textContent = old;
 }
 
 function dayLabel(iso) {
@@ -244,6 +343,58 @@ async function renderTimeline() {
       edit.addEventListener('click', () => openEditModal(a));
       card.appendChild(edit);
     }
+
+    const joins = Array.isArray(a.joins) ? a.joins : [];
+    const iJoined = joins.some((j) => j.email === state.email);
+
+    const foot = document.createElement('div');
+    foot.className = 'ann-foot';
+    const avs = document.createElement('div');
+    avs.className = 'joins';
+    const show = joins.slice(0, 6);
+    for (const j of show) {
+      const av = document.createElement('span');
+      av.className = 'join-av';
+      av.title = j.name;
+      if (j.photo) {
+        const im = document.createElement('img');
+        im.src = j.photo;
+        im.alt = j.name;
+        im.referrerPolicy = 'no-referrer';
+        av.appendChild(im);
+      } else {
+        av.textContent = String(j.name || '?').trim().charAt(0).toUpperCase();
+      }
+      avs.appendChild(av);
+    }
+    if (joins.length > show.length) {
+      const more = document.createElement('span');
+      more.className = 'join-more';
+      more.textContent = `+${joins.length - show.length}`;
+      avs.appendChild(more);
+    }
+    if (avs.children.length) foot.appendChild(avs);
+    if (a.email === state.email) {
+      const cnt = document.createElement('span');
+      cnt.className = 'join-count';
+      cnt.textContent = joins.length
+        ? `${joins.length} ${joins.length === 1 ? 'pessoa vai' : 'pessoas vão'} junto`
+        : 'Você anunciou. A galera pode se unir aqui.';
+      foot.appendChild(cnt);
+    } else {
+      const btn = document.createElement('button');
+      if (iJoined) {
+        btn.className = 'mini-act joined';
+        btn.textContent = 'Você vai ✔';
+        btn.addEventListener('click', () => unjoinEvent(a.id));
+      } else {
+        btn.className = 'mini-act primary';
+        btn.textContent = 'Vou junto';
+        btn.addEventListener('click', () => joinEvent(a.id));
+      }
+      foot.appendChild(btn);
+    }
+    card.appendChild(foot);
     container.appendChild(card);
   }
 }
@@ -369,6 +520,10 @@ function start() {
   $('#previewBack').addEventListener('click', () => goMenuStep(0));
   $('#menuSave').addEventListener('click', saveMenu);
   $('#logoutBtn').addEventListener('click', logout);
+
+  $('#notifBtn').addEventListener('click', openNotifs);
+  $('#notifClose').addEventListener('click', closeNotifs);
+  $('#notifEnable').addEventListener('click', enableNotifs);
 
   $('#friendsBtn').addEventListener('click', openFriends);
   $('#friendsClose').addEventListener('click', closeFriends);
@@ -800,6 +955,38 @@ async function friendAction(action, email) {
     const q = $('#friendSearch').value.trim();
     if (q) onFriendSearch({ target: { value: q } });
     if (state.scope === 'friends') renderTimeline();
+  } catch {
+    toast('Falha. Tente de novo.');
+  }
+}
+
+async function joinEvent(id) {
+  try {
+    const resp = await fetch(`/api/announce/${id}/join`, { method: 'POST', headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      toast(j.error || 'Falha ao entrar.');
+      return;
+    }
+    toast('Você vai junto! 🔔');
+    renderTimeline();
+  } catch {
+    toast('Falha. Tente de novo.');
+  }
+}
+
+async function unjoinEvent(id) {
+  try {
+    const resp = await fetch(`/api/announce/${id}/join`, { method: 'DELETE', headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      toast(j.error || 'Falha ao sair.');
+      return;
+    }
+    toast('Você saiu do aviso.');
+    renderTimeline();
   } catch {
     toast('Falha. Tente de novo.');
   }
