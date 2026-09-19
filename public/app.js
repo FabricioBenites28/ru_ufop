@@ -177,7 +177,9 @@ function openNotifs() {
   fetch('/api/vapid')
     .then((r) => r.json())
     .then((v) => {
-      if (!v.envKeys) {
+      if (v.envInvalid) {
+        $('#notifStatus').textContent = '⚠ Chaves VAPID do Render são inválidas. Pegue um par válido, cole em VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY e redeploye.';
+      } else if (!v.envKeys) {
         $('#notifStatus').textContent = '⚠ Servidor sem chaves VAPID fixas. Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no Render para as notificações funcionarem.';
       }
     })
@@ -229,6 +231,9 @@ function renderNotifState() {
 
 function shortErr(err) {
   const msg = String(err && err.name || err && err.message || err) || 'erro desconhecido';
+  if (/InvalidAccess|InvalidCharacter/i.test(msg)) {
+    return 'Chave VAPID do servidor inválida. Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY corretas no Render.';
+  }
   if (/NotAllowed|abort|SecurityError/i.test(msg)) {
     return 'Permissão de notificação não permitida neste Safari. Abra pelo ícone instalado.';
   }

@@ -134,22 +134,38 @@ async function save() {
   }
 }
 
+function isValidVapidKeys(publicKey, privateKey) {
+  try {
+    const pub = Buffer.from(String(publicKey).trim(), 'base64url');
+    const priv = Buffer.from(String(privateKey).trim(), 'base64url');
+    return pub.length === 65 && priv.length === 32;
+  } catch {
+    return false;
+  }
+}
+
 function loadVapid() {
-  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY &&
+      isValidVapidKeys(process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)) {
     return {
       subject: process.env.VAPID_SUBJECT || 'mailto:ru@ufop.local',
       publicKey: process.env.VAPID_PUBLIC_KEY,
       privateKey: process.env.VAPID_PRIVATE_KEY,
+      envKeys: true,
     };
   }
+  if (process.env.VAPID_PUBLIC_KEY && !isValidVapidKeys(process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)) {
+    console.error('VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY inválidas no ambiente; usando chaves geradas no servidor.');
+  }
   try {
-    return JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8'));
+    return { ...JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8')), envKeys: false };
   } catch {
     const keys = webpush.generateVAPIDKeys();
     const config = {
       subject: 'mailto:ru@ufop.local',
       publicKey: keys.publicKey,
       privateKey: keys.privateKey,
+      envKeys: false,
     };
     fs.writeFileSync(VAPID_FILE, JSON.stringify(config));
     return config;
@@ -524,9 +540,11 @@ app.post('/api/subscribe', async (req, res) => {
 });
 
 app.get('/api/vapid', (req, res) => {
+  const envHasKeys = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
   res.json({
     publicKey: vapid.publicKey,
-    envKeys: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+    envKeys: !!vapid.envKeys,
+    envInvalid: envHasKeys && !vapid.envKeys,
   });
 });
 
