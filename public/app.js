@@ -117,31 +117,41 @@ function toast(msg) {
   toast._t = setTimeout(() => el.classList.add('hidden'), 3000);
 }
 
+async function getCurrentPush(reg) {
+  const { publicKey } = await (await fetch('/api/vapid')).json();
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
+    await sub.unsubscribe();
+    sub = null;
+  }
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    localStorage.setItem('ru_vapid', publicKey);
+  }
+  return sub;
+}
+
+async function storeSubscription(sub) {
+  if (!sub || !state.email) return false;
+  const resp = await fetch('/api/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...sub.toJSON(), email: state.email }),
+  });
+  return resp.ok;
+}
+
 async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') return;
+  if (!state.email) return;
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
-    const { publicKey } = await (await fetch('/api/vapid')).json();
-    let sub = await reg.pushManager.getSubscription();
-    if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
-      await sub.unsubscribe();
-      sub = null;
-    }
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
-      localStorage.setItem('ru_vapid', publicKey);
-    }
-    if (sub) {
-      await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...sub.toJSON(), email: state.email || '' }),
-      });
-    }
+    const sub = await getCurrentPush(reg);
+    await storeSubscription(sub);
   } catch (err) {
     console.error('push falhou:', err);
   }
@@ -235,30 +245,16 @@ async function enableNotifs() {
   }
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
-    const { publicKey } = await (await fetch('/api/vapid')).json();
-    let sub = await reg.pushManager.getSubscription();
-    if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
-      await sub.unsubscribe();
-      sub = null;
-    }
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
-      localStorage.setItem('ru_vapid', publicKey);
-    }
-    if (sub) {
-      await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...sub.toJSON(), email: state.email || '' }),
-      });
-    }
-    toast('Notificações ativadas! 🔔');
+    const sub = await getCurrentPush(reg);
+    const ok = await storeSubscription(sub);
+    if (ok) toast('Notificações ativadas! 🔔');
+    else toast('Não foi possível registrar este navegador.');
   } catch (err) {
     console.error('push falhou:', err);
-    toast('Não foi possível ativar. Veja a dica.');
+    const msg = String(err && err.name || err && err.message || err);
+    toast(/NotAllowed|abort/i.test(msg)
+      ? 'Permissão de notificação não permitida neste Safari.'
+      : 'Não foi possível ativar. Veja a dica.');
   }
   renderNotifState();
   btn.disabled = false;
@@ -270,11 +266,20 @@ async function sendTestPush() {
   btn.disabled = true;
   btn.textContent = 'Enviando…';
   try {
+    if (canPush() && Notification.permission === 'granted' && state.email) {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const sub = await getCurrentPush(reg);
+        await storeSubscription(sub);
+      } catch (err) {
+        console.error('reparo de sub falhou:', err);
+      }
+    }
     const resp = await fetch('/api/test-push', { method: 'POST', headers: authHeaders() });
     if (resp.status === 401) return handleAuthExpired();
     const j = await resp.json();
     if (j.total === 0) {
-      toast('Sem inscrição de push neste usuário. Toque em Ativar.');
+      toast('Sem inscrição de push. Toque em Ativar e permita a notificação.');
     } else if (j.ok > 0) {
       toast('Notificação de teste enviada! 🔔 Confira seu celular.');
     } else {

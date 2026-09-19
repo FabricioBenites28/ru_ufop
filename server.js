@@ -544,6 +544,7 @@ app.post('/api/test-push', requireAuth, async (req, res) => {
     errorCodes: results.filter((r) => !r.ok).map((r) => r.code),
     errors: results.filter((r) => !r.ok).map((r) => r.message),
     vapidPublicKey: vapid.publicKey,
+    orphans: db.subscriptions.filter((s) => !s.email).length,
   });
 });
 
