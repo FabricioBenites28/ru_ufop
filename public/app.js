@@ -218,6 +218,13 @@ async function enableNotifs() {
   btn.disabled = true;
   const old = btn.textContent;
   btn.textContent = 'Ativando…';
+  if (isIOS() && !isStandaloneApp()) {
+    renderNotifState();
+    toast('No iPhone, instale o app primeiro: Compartilhar ➜ Adicionar à Tela de Início.');
+    btn.disabled = false;
+    btn.textContent = old;
+    return;
+  }
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') {
     renderNotifState();
@@ -266,10 +273,17 @@ async function sendTestPush() {
     const resp = await fetch('/api/test-push', { method: 'POST', headers: authHeaders() });
     if (resp.status === 401) return handleAuthExpired();
     const j = await resp.json();
-    if (j.sent > 0) {
+    if (j.total === 0) {
+      toast('Sem inscrição de push neste usuário. Toque em Ativar.');
+    } else if (j.ok > 0) {
       toast('Notificação de teste enviada! 🔔 Confira seu celular.');
     } else {
-      toast('Sem inscrição de push neste usuário. Toque em Ativar.');
+      const codes = (j.errorCodes || []).join(',');
+      if (codes.includes(401) || /VAPID|mismatch/i.test((j.errors || []).join(' '))) {
+        toast('Clave push desactualizada: toca Ativar para regenerar la inscripción.');
+      } else {
+        toast('Falhou (código ' + codes + '): ' + ((j.errors || [])[0] || 'erro desconhecido'));
+      }
     }
   } catch {
     toast('Falha ao enviar teste.');

@@ -166,6 +166,7 @@ function sendNotifications(subs, payload) {
       .sendNotification(sub, payload)
       .catch((err) => {
         if (err.statusCode === 404 || err.statusCode === 410) dead.push(sub);
+        else console.error('push[' + (err.statusCode || '?') + ']:', String(err.message || err).slice(0, 300));
       })
   );
   Promise.all(jobs).then(async () => {
@@ -526,16 +527,24 @@ app.get('/api/vapid', (req, res) => {
   res.json({ publicKey: vapid.publicKey });
 });
 
-app.post('/api/test-push', requireAuth, (req, res) => {
-  const count = db.subscriptions.filter((s) => s.email === req.user.email).length;
-  if (count > 0) {
+app.post('/api/test-push', requireAuth, async (req, res) => {
+  const results = [];
+  for (const sub of db.subscriptions.filter((s) => s.email === req.user.email)) {
     try {
-      sendPushToEmails([req.user.email], '🔔 RU UFOP', 'Suas notificações estão funcionando!');
+      await webpush.sendNotification(sub, JSON.stringify({ title: '🔔 RU UFOP', body: 'Suas notificações estão funcionando!' }));
+      results.push({ ok: true, code: 201 });
     } catch (err) {
-      return res.status(500).json({ error: String(err && err.message || err) });
+      results.push({ ok: false, code: err.statusCode || 500, message: String(err.message || err).slice(0, 200) });
     }
   }
-  res.json({ sent: count });
+  res.json({
+    total: results.length,
+    ok: results.filter((r) => r.ok).length,
+    fail: results.filter((r) => !r.ok).length,
+    errorCodes: results.filter((r) => !r.ok).map((r) => r.code),
+    errors: results.filter((r) => !r.ok).map((r) => r.message),
+    vapidPublicKey: vapid.publicKey,
+  });
 });
 
 app.get('/api/config', (req, res) => {
