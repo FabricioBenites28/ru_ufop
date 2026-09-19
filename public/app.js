@@ -120,7 +120,12 @@ function toast(msg) {
 async function getCurrentPush(reg) {
   const { publicKey } = await (await fetch('/api/vapid')).json();
   let sub = await reg.pushManager.getSubscription();
-  if (sub && localStorage.getItem('ru_vapid') !== publicKey) {
+  const reset = !sub ||
+    !sub.keys ||
+    !sub.keys.p256dh ||
+    !sub.keys.auth ||
+    localStorage.getItem('ru_vapid') !== publicKey;
+  if (sub && reset) {
     await sub.unsubscribe();
     sub = null;
   }
@@ -265,7 +270,12 @@ async function enableNotifs() {
     return;
   }
   try {
-    const reg = await navigator.serviceWorker.ready;
+    let reg;
+    if (navigator.serviceWorker.controller) {
+      reg = await navigator.serviceWorker.ready;
+    } else {
+      reg = await navigator.serviceWorker.register('/sw.js');
+    }
     const sub = await getCurrentPush(reg);
     const ok = await storeSubscription(sub);
     if (ok) {
@@ -290,7 +300,9 @@ async function sendTestPush() {
   try {
     if (canPush() && Notification.permission === 'granted' && state.email) {
       try {
-        const reg = await navigator.serviceWorker.ready;
+        const reg = navigator.serviceWorker.controller
+          ? await navigator.serviceWorker.ready
+          : await navigator.serviceWorker.register('/sw.js');
         const sub = await getCurrentPush(reg);
         await storeSubscription(sub);
       } catch (err) {
@@ -308,7 +320,7 @@ async function sendTestPush() {
     } else {
       const codes = (j.errorCodes || []).join(',');
       if (codes.includes(401) || /VAPID|mismatch/i.test((j.errors || []).join(' '))) {
-        toast('Clave push desactualizada: toca Ativar para regenerar la inscripción.');
+        toast('Chave push desatualizada: toque em Ativar para regenerar a inscrição.');
       } else {
         toast('Falhou (código ' + codes + '): ' + ((j.errors || [])[0] || 'erro desconhecido'));
       }

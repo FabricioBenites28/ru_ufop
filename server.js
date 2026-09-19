@@ -144,11 +144,13 @@ function isValidVapidKeys(publicKey, privateKey) {
   }
 }
 
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'https://ru-ufop.onrender.com';
+
 function loadVapid() {
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY &&
       isValidVapidKeys(process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY)) {
     return {
-      subject: process.env.VAPID_SUBJECT || 'mailto:ru@ufop.local',
+      subject: VAPID_SUBJECT,
       publicKey: process.env.VAPID_PUBLIC_KEY,
       privateKey: process.env.VAPID_PRIVATE_KEY,
       envKeys: true,
@@ -158,11 +160,17 @@ function loadVapid() {
     console.error('VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY inválidas no ambiente; usando chaves geradas no servidor.');
   }
   try {
-    return { ...JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8')), envKeys: false };
+    const saved = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8'));
+    return {
+      subject: VAPID_SUBJECT,
+      publicKey: saved.publicKey,
+      privateKey: saved.privateKey,
+      envKeys: false,
+    };
   } catch {
     const keys = webpush.generateVAPIDKeys();
     const config = {
-      subject: 'mailto:ru@ufop.local',
+      subject: VAPID_SUBJECT,
       publicKey: keys.publicKey,
       privateKey: keys.privateKey,
       envKeys: false,
@@ -175,37 +183,63 @@ function loadVapid() {
 const vapid = loadVapid();
 webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
 
-let externalHost = 'ru-ufop.onrender.com';
+const APP_HOST = process.env.APP_HOST || 'ru-ufop.onrender.com';
+let externalHost = APP_HOST;
 app.use((req, _res, next) => {
-  if (req.hostname) externalHost = req.hostname;
+  if (!process.env.APP_HOST && req.hostname) {
+    const h = req.hostname;
+    if (h && h !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(h)) externalHost = h;
+  }
   next();
 });
 
 function pushOptionsFor(endpoint) {
-  const opts = {};
-  if (String(endpoint).includes('web.push.apple.com')) {
-    opts.headers = {
+  if (!String(endpoint).includes('web.push.apple.com')) return {};
+  return {
+    headers: {
       'apns-topic': 'web.' + externalHost,
+      'apns-push-type': 'alert',
       'apns-priority': '10',
-    };
-  }
-  return opts;
+    },
+  };
+}
+
+function pushHost(endpoint) {
+  const e = String(endpoint || '');
+  if (e.includes('web.push.apple.com')) return 'apple';
+  if (e.includes('fcm.googleapis.com')) return 'fcm';
+  if (e.includes('push.mozilla.org')) return 'mozilla';
+  return '?';
+}
+
+function pushReason(err) {
+  let reason = '';
+  try { reason = JSON.parse(err.body || '').reason || ''; } catch {}
+  return reason;
 }
 
 function sendNotifications(subs, payload) {
   const dead = [];
-  const jobs = subs.map((sub) =>
-    webpush
+  const broken = [];
+  const jobs = subs.map((sub) => {
+    if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
+      broken.push(sub);
+      return Promise.resolve();
+    }
+    return webpush
       .sendNotification(sub, payload, pushOptionsFor(sub.endpoint))
       .catch((err) => {
         if (err.statusCode === 404 || err.statusCode === 410) dead.push(sub);
-        else console.error('push[' + (err.statusCode || '?') + ']:', String(err.message || err).slice(0, 300));
-      })
-  );
+        else {
+          const reason = pushReason(err);
+          console.error(`push[${err.statusCode || '?'} ${pushHost(sub.endpoint)}]:`, reason ? `${reason} — ` : '', String(err.message || err).slice(0, 200));
+        }
+      });
+  });
   Promise.all(jobs).then(async () => {
-    if (dead.length) {
-      const deadSet = new Set(dead);
-      db.subscriptions = db.subscriptions.filter((s) => !deadSet.has(s));
+    const remove = new Set([...dead, ...broken].filter(Boolean).map((s) => String(s.endpoint)));
+    if (remove.size) {
+      db.subscriptions = db.subscriptions.filter((s) => !remove.has(String(s.endpoint)));
       await save();
     }
   });
@@ -566,22 +600,37 @@ app.get('/api/vapid', (req, res) => {
 });
 
 app.post('/api/test-push', requireAuth, async (req, res) => {
+  const mine = db.subscriptions.filter((s) => s.email === req.user.email);
   const results = [];
-  for (const sub of db.subscriptions.filter((s) => s.email === req.user.email)) {
+  for (const sub of mine) {
+    if (!sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
+      results.push({ ok: false, code: 'no-keys', message: 'inscrição sem chaves (toque em Ativar para recriar)' });
+      db.subscriptions = db.subscriptions.filter((s) => s.endpoint !== sub.endpoint);
+      continue;
+    }
     try {
       await webpush.sendNotification(sub, JSON.stringify({ title: '🔔 RU UFOP', body: 'Suas notificações estão funcionando!' }), pushOptionsFor(sub.endpoint));
       results.push({ ok: true, code: 201 });
     } catch (err) {
-      results.push({ ok: false, code: err.statusCode || 500, message: String(err.message || err).slice(0, 200) });
+      results.push({ ok: false, code: err.statusCode || 500, message: String(err.message || err).slice(0, 200), reason: pushReason(err) });
     }
+  }
+  await save();
+  const byHost = {};
+  for (const s of mine) {
+    const h = pushHost(s.endpoint);
+    byHost[h] = (byHost[h] || 0) + 1;
   }
   res.json({
     total: results.length,
     ok: results.filter((r) => r.ok).length,
     fail: results.filter((r) => !r.ok).length,
     errorCodes: results.filter((r) => !r.ok).map((r) => r.code),
+    reasons: results.filter((r) => r.reason).map((r) => r.reason),
     errors: results.filter((r) => !r.ok).map((r) => r.message),
+    byHost,
     vapidPublicKey: vapid.publicKey,
+    vapidSubject: vapid.subject,
     orphans: db.subscriptions.filter((s) => !s.email).length,
   });
 });
