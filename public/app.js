@@ -117,12 +117,6 @@ function toast(msg) {
   toast._t = setTimeout(() => el.classList.add('hidden'), 3000);
 }
 
-function setStatus(ok) {
-  const el = $('#status');
-  el.textContent = ok ? 'online' : 'offline';
-  el.className = 'badge ' + (ok ? 'online' : 'offline');
-}
-
 async function enablePush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') return;
@@ -269,9 +263,7 @@ async function renderTimeline() {
     const resp = await fetch('/api/announcements' + (state.scope === 'friends' ? '?scope=friends' : ''), { headers: authHeaders() });
     if (resp.status === 401) return handleAuthExpired();
     list = await resp.json();
-    setStatus(true);
   } catch {
-    setStatus(false);
   }
   list.sort((a, b) => new Date(a.arrive) - new Date(b.arrive) || new Date(a.announceAt) - new Date(b.announceAt));
 
