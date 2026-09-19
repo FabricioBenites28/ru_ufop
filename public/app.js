@@ -174,6 +174,14 @@ function openNotifs() {
   $('#notifOverlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   renderNotifState();
+  fetch('/api/vapid')
+    .then((r) => r.json())
+    .then((v) => {
+      if (!v.envKeys) {
+        $('#notifStatus').textContent = '⚠ Servidor sem chaves VAPID fixas. Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no Render para as notificações funcionarem.';
+      }
+    })
+    .catch(() => {});
 }
 
 function closeNotifs() {
@@ -219,6 +227,14 @@ function renderNotifState() {
   }
 }
 
+function shortErr(err) {
+  const msg = String(err && err.name || err && err.message || err) || 'erro desconhecido';
+  if (/NotAllowed|abort|SecurityError/i.test(msg)) {
+    return 'Permissão de notificação não permitida neste Safari. Abra pelo ícone instalado.';
+  }
+  return 'Erro de ativação: ' + msg.slice(0, 140);
+}
+
 async function enableNotifs() {
   const btn = $('#notifEnable');
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
@@ -244,17 +260,18 @@ async function enableNotifs() {
     return;
   }
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js');
+    const reg = await navigator.serviceWorker.ready;
     const sub = await getCurrentPush(reg);
     const ok = await storeSubscription(sub);
-    if (ok) toast('Notificações ativadas! 🔔');
-    else toast('Não foi possível registrar este navegador.');
+    if (ok) {
+      toast('Notificações ativadas! 🔔');
+      enablePush();
+    } else {
+      toast('Não foi possível registrar este navegador (inscrição não aceita). Tente de novo.');
+    }
   } catch (err) {
     console.error('push falhou:', err);
-    const msg = String(err && err.name || err && err.message || err);
-    toast(/NotAllowed|abort/i.test(msg)
-      ? 'Permissão de notificação não permitida neste Safari.'
-      : 'Não foi possível ativar. Veja a dica.');
+    toast(shortErr(err));
   }
   renderNotifState();
   btn.disabled = false;
@@ -268,11 +285,12 @@ async function sendTestPush() {
   try {
     if (canPush() && Notification.permission === 'granted' && state.email) {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        const reg = await navigator.serviceWorker.ready;
         const sub = await getCurrentPush(reg);
         await storeSubscription(sub);
       } catch (err) {
         console.error('reparo de sub falhou:', err);
+        return toast(shortErr(err));
       }
     }
     const resp = await fetch('/api/test-push', { method: 'POST', headers: authHeaders() });
@@ -589,6 +607,7 @@ function start() {
   });
   renderTimeline();
   renderMenu();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   enablePush();
 }
 

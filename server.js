@@ -524,7 +524,10 @@ app.post('/api/subscribe', async (req, res) => {
 });
 
 app.get('/api/vapid', (req, res) => {
-  res.json({ publicKey: vapid.publicKey });
+  res.json({
+    publicKey: vapid.publicKey,
+    envKeys: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+  });
 });
 
 app.post('/api/test-push', requireAuth, async (req, res) => {
