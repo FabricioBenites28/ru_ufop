@@ -175,11 +175,28 @@ function loadVapid() {
 const vapid = loadVapid();
 webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
 
+let externalHost = 'ru-ufop.onrender.com';
+app.use((req, _res, next) => {
+  if (req.hostname) externalHost = req.hostname;
+  next();
+});
+
+function pushOptionsFor(endpoint) {
+  const opts = {};
+  if (String(endpoint).includes('web.push.apple.com')) {
+    opts.headers = {
+      'apns-topic': 'web.' + externalHost,
+      'apns-priority': '10',
+    };
+  }
+  return opts;
+}
+
 function sendNotifications(subs, payload) {
   const dead = [];
   const jobs = subs.map((sub) =>
     webpush
-      .sendNotification(sub, payload)
+      .sendNotification(sub, payload, pushOptionsFor(sub.endpoint))
       .catch((err) => {
         if (err.statusCode === 404 || err.statusCode === 410) dead.push(sub);
         else console.error('push[' + (err.statusCode || '?') + ']:', String(err.message || err).slice(0, 300));
@@ -552,7 +569,7 @@ app.post('/api/test-push', requireAuth, async (req, res) => {
   const results = [];
   for (const sub of db.subscriptions.filter((s) => s.email === req.user.email)) {
     try {
-      await webpush.sendNotification(sub, JSON.stringify({ title: '🔔 RU UFOP', body: 'Suas notificações estão funcionando!' }));
+      await webpush.sendNotification(sub, JSON.stringify({ title: '🔔 RU UFOP', body: 'Suas notificações estão funcionando!' }), pushOptionsFor(sub.endpoint));
       results.push({ ok: true, code: 201 });
     } catch (err) {
       results.push({ ok: false, code: err.statusCode || 500, message: String(err.message || err).slice(0, 200) });
