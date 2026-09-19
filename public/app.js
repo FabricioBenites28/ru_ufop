@@ -260,7 +260,7 @@ function dayLabel(iso) {
 async function renderTimeline() {
   let list = [];
   try {
-    const resp = await fetch('/api/announcements' + (state.scope === 'friends' ? '?scope=friends' : ''), { headers: authHeaders() });
+    const resp = await fetch('/api/announcements' + (state.scope === 'friends' || state.scope === 'me' ? `?scope=${state.scope}` : ''), { headers: authHeaders() });
     if (resp.status === 401) return handleAuthExpired();
     list = await resp.json();
   } catch {
@@ -275,6 +275,9 @@ async function renderTimeline() {
   if (state.scope === 'friends') {
     emptyTitle.textContent = 'Nada dos seus amigos por aqui.';
     emptySub.textContent = 'Peça para eles anunciarem — ou adicione mais amigos. 👥';
+  } else if (state.scope === 'me') {
+    emptyTitle.textContent = 'Você ainda não anunciou nada.';
+    emptySub.textContent = 'Toque em ➕ Anunciar para avisar o pessoal.';
   } else {
     emptyTitle.textContent = 'Ninguém anunciou ainda.';
     emptySub.textContent = 'Quando for, toque em ➕ Anunciar para avisar o pessoal.';
@@ -521,6 +524,7 @@ function start() {
   $('#friendsClose').addEventListener('click', closeFriends);
   $('#scopeAllBtn').addEventListener('click', () => setScope('all'));
   $('#scopeFriendsBtn').addEventListener('click', () => setScope('friends'));
+  $('#scopeMeBtn').addEventListener('click', () => setScope('me'));
   $('#friendSearch').addEventListener('input', onFriendSearch);
   $('#friendsOverlay').addEventListener('click', (e) => {
     const btn = e.target.closest('.mini-act');
@@ -793,6 +797,7 @@ async function renderMenu() {
 function syncScopeTabs() {
   $('#scopeAllBtn').classList.toggle('active', state.scope === 'all');
   $('#scopeFriendsBtn').classList.toggle('active', state.scope === 'friends');
+  $('#scopeMeBtn').classList.toggle('active', state.scope === 'me');
 }
 
 function setScope(s) {

@@ -318,8 +318,11 @@ app.get('/api/announcements', optionalAuth, (req, res) => {
   if (req.query.scope === 'friends') {
     if (!req.user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
     const me = ensureUser(req.user);
-    const allowed = new Set([...me.friends, req.user.email]);
+    const allowed = new Set(me.friends);
     list = list.filter((a) => a.email && allowed.has(a.email));
+  } else if (req.query.scope === 'me') {
+    if (!req.user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
+    list = list.filter((a) => a.email === req.user.email);
   }
   res.json(
     list.map((a) => {
