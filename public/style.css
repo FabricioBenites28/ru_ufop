@@ -881,6 +881,43 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .friends-hint { text-align: center; padding: var(--s4); margin: 0; }
 .friend-sections { margin-top: var(--s3); }
 
+/* ===================== grupos ===================== */
+
+#groupBar {
+  display: flex;
+  gap: var(--s2);
+  overflow-x: auto;
+  padding: 2px var(--s1) var(--s4);
+  margin-bottom: 0;
+  scrollbar-width: none;
+}
+#groupBar::-webkit-scrollbar { display: none; }
+
+#groupBar .tab {
+  flex: none;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+#groupBar .tab.active {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: transparent;
+}
+#groupBar .tab.add-chip {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.group-select { margin-bottom: var(--s4); }
+.group-select select { font-size: 14px; padding: 12px 14px; }
+
+#groupsList { margin-bottom: var(--s3); }
+#groupsOverlay .day-group { margin: var(--s4) 0 var(--s3); }
+#groupName, #groupDesc, #groupCodeInput { margin-bottom: var(--s3); }
+
 /* ===================== notificações ===================== */
 
 .primary.wide { width: 100%; margin-top: var(--s3); }

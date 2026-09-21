@@ -67,7 +67,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
   });
 }
 
-let db = { announcements: [], menus: [], subscriptions: [], users: {} };
+let db = { announcements: [], menus: [], subscriptions: [], users: {}, groups: [] };
 
 function normalizeDb() {
   if (!Array.isArray(db.announcements)) db.announcements = [];
@@ -90,6 +90,16 @@ function normalizeDb() {
     u.incoming = Array.isArray(u.incoming) ? u.incoming : [];
     u.outgoing = Array.isArray(u.outgoing) ? u.outgoing : [];
   }
+  if (!Array.isArray(db.groups)) db.groups = [];
+  else db.groups = db.groups.filter((g) => g && typeof g === 'object' && g.id && g.name);
+  for (const g of db.groups) {
+    g.members = Array.isArray(g.members)
+      ? g.members.map((m) => String(m).trim().toLowerCase()).filter(Boolean)
+      : [];
+    g.owner = String(g.owner || '').trim().toLowerCase();
+    g.code = String(g.code || '').trim().toUpperCase();
+    if (g.owner && !g.members.includes(g.owner)) g.members.push(g.owner);
+  }
   return db;
 }
 
@@ -108,7 +118,7 @@ async function loadData() {
     db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     if (!db || typeof db !== 'object') throw new Error('dados corrompidos');
   } catch {
-    db = { announcements: [], menus: [], subscriptions: [], users: {} };
+    db = { announcements: [], menus: [], subscriptions: [], users: {}, groups: [] };
   }
   normalizeDb();
 }
@@ -260,6 +270,37 @@ function friendsOfEmail(email) {
   return u && Array.isArray(u.friends) ? u.friends : [];
 }
 
+function groupById(id) {
+  return (db.groups || []).find((g) => g.id === id);
+}
+
+function groupMemberEmails(gid) {
+  const g = groupById(gid);
+  return g && Array.isArray(g.members) ? g.members : [];
+}
+
+function publicGroup(g) {
+  return {
+    id: g.id,
+    name: g.name,
+    description: g.description || '',
+    owner: g.owner,
+    code: g.code,
+    memberCount: g.members.length,
+    createdAt: g.createdAt,
+  };
+}
+
+function groupCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  do {
+    code = '';
+    for (let i = 0; i < 6; i++) code += chars[crypto.randomInt(chars.length)];
+  } while ((db.groups || []).some((g) => g.code === code));
+  return code;
+}
+
 const EMAIL_RE = /^[a-z0-9._%+\-]+@(?:aluno\.)?ufop\.edu\.br$/i;
 
 function loadSessionSecret() {
@@ -383,14 +424,24 @@ function purgeExpiredAnnouncements() {
 app.get('/api/announcements', optionalAuth, (req, res) => {
   if (purgeExpiredAnnouncements()) save();
   let list = db.announcements;
-  if (req.query.scope === 'friends') {
+  if (req.query.scope === 'group') {
     if (!req.user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
-    const me = ensureUser(req.user);
-    const allowed = new Set(me.friends);
-    list = list.filter((a) => a.email && allowed.has(a.email));
-  } else if (req.query.scope === 'me') {
-    if (!req.user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
-    list = list.filter((a) => a.email === req.user.email);
+    const g = groupById(String(req.query.groupId || ''));
+    if (!g || !g.members.includes(req.user.email)) {
+      return res.status(403).json({ error: 'grupo não encontrado' });
+    }
+    list = list.filter((a) => a.groupId === g.id);
+  } else {
+    list = list.filter((a) => !a.groupId);
+    if (req.query.scope === 'friends') {
+      if (!req.user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
+      const me = ensureUser(req.user);
+      const allowed = new Set(me.friends);
+      list = list.filter((a) => a.email && allowed.has(a.email));
+    } else if (req.query.scope === 'me') {
+      if (!req.user) return res.status(401).json({ error: 'faça login com a conta UFOP' });
+      list = list.filter((a) => a.email === req.user.email);
+    }
   }
   res.json(
     list.map((a) => {
@@ -452,6 +503,15 @@ app.post('/api/announce', requireAuth, async (req, res) => {
   const email = req.user.email;
   const info = arrivalInfo(req.body);
   if (!info) return res.status(400).json({ error: 'horário inválido' });
+  const groupId = String(req.body.groupId || '').trim();
+  let groupName = '';
+  if (groupId) {
+    const g = groupById(groupId);
+    if (!g || !g.members.includes(email)) {
+      return res.status(403).json({ error: 'você não pertence a esse grupo' });
+    }
+    groupName = g.name;
+  }
   const userId = req.user.email;
   const now = Date.now();
   db.announcements = db.announcements.filter(
@@ -473,10 +533,17 @@ app.post('/api/announce', requireAuth, async (req, res) => {
     inMinutes: info.inMinutes,
     exact: info.exact,
     label: info.label,
+    groupId: groupId || '',
+    groupName: groupName || '',
   };
   db.announcements.push(announcement);
   await save();
-  sendPushToEmails(friendsOfEmail(email), name, `Vai comer no RU ${info.label}`);
+  const pushEmails = groupId
+    ? groupMemberEmails(groupId).filter((e) => e && e !== email)
+    : friendsOfEmail(email);
+  if (pushEmails.length) {
+    sendPushToEmails(pushEmails, name, `Vai comer no RU ${info.label}${groupName ? ` (${groupName})` : ''}`);
+  }
   res.json(announcement);
 });
 
@@ -789,6 +856,69 @@ app.delete('/api/friends/:email', requireAuth, async (req, res) => {
     target.incoming = target.incoming.filter((e) => e !== me.email);
     target.outgoing = target.outgoing.filter((e) => e !== me.email);
   }
+  await save();
+  res.json({ ok: true });
+});
+
+app.get('/api/groups', requireAuth, (req, res) => {
+  const mine = (db.groups || []).filter((g) => g.members.includes(req.user.email)).map(publicGroup);
+  res.json(mine);
+});
+
+app.post('/api/groups', requireAuth, async (req, res) => {
+  const name = String(req.body.name || '').trim().slice(0, 60);
+  if (!name) return res.status(400).json({ error: 'dê um nome ao grupo' });
+  const description = String(req.body.description || '').trim().slice(0, 200);
+  const group = {
+    id: crypto.randomUUID(),
+    name,
+    description,
+    owner: req.user.email,
+    members: [req.user.email],
+    code: groupCode(),
+    createdAt: new Date().toISOString(),
+  };
+  db.groups = db.groups || [];
+  db.groups.push(group);
+  await save();
+  res.json(publicGroup(group));
+});
+
+app.post('/api/groups/join', requireAuth, async (req, res) => {
+  const code = String(req.body.code || '').trim().toUpperCase();
+  const g = (db.groups || []).find((x) => x.code === code);
+  if (!g) return res.status(404).json({ error: 'código inválido' });
+  if (g.members.includes(req.user.email)) return res.json(publicGroup(g));
+  g.members.push(req.user.email);
+  await save();
+  sendPushToEmails([g.owner], req.user.name || nameFromEmail(req.user.email), `entrou no grupo ${g.name}`);
+  res.json(publicGroup(g));
+});
+
+app.post('/api/groups/:id/leave', requireAuth, async (req, res) => {
+  const g = groupById(req.params.id);
+  if (!g) return res.status(404).json({ error: 'grupo não encontrado' });
+  if (!g.members.includes(req.user.email)) {
+    return res.status(403).json({ error: 'você não é membro desse grupo' });
+  }
+  g.members = g.members.filter((e) => e !== req.user.email);
+  await save();
+  if (!g.members.length) {
+    db.groups = db.groups.filter((x) => x.id !== g.id);
+    db.announcements = db.announcements.filter((a) => a.groupId !== g.id);
+    await save();
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/groups/:id', requireAuth, async (req, res) => {
+  const g = groupById(req.params.id);
+  if (!g) return res.status(404).json({ error: 'grupo não encontrado' });
+  if (g.owner !== req.user.email) {
+    return res.status(403).json({ error: 'só o criador do grupo pode excluir' });
+  }
+  db.groups = db.groups.filter((x) => x.id !== g.id);
+  db.announcements = db.announcements.filter((a) => a.groupId !== g.id);
   await save();
   res.json({ ok: true });
 });

@@ -18,6 +18,9 @@ const state = {
   pendingPhoto: '',
   editingId: '',
   scope: localStorage.getItem('ru_scope') || 'all',
+  groups: [],
+  groupId: '',
+  announceGroup: '',
 };
 
 const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
@@ -88,11 +91,15 @@ function openLogin() {
   state.email = '';
   state.photo = '';
   state.course = '';
+  state.groups = [];
+  state.groupId = '';
+  state.announceGroup = '';
   $('#logoutBtn').classList.add('hidden');
   $('#profileBtn').classList.add('hidden');
   $('#announceBtn').classList.add('hidden');
   $('#friendsBtn').classList.add('hidden');
   $('#scopeBar').classList.add('hidden');
+  $('#groupBar').classList.add('hidden');
   $('#emailOverlay').classList.remove('hidden');
   $('#gButton').innerHTML = '';
   $('#authError').classList.add('hidden');
@@ -345,8 +352,17 @@ function dayLabel(iso) {
 async function renderTimeline() {
   let list = [];
   try {
-    const resp = await fetch('/api/announcements' + (state.scope === 'friends' || state.scope === 'me' ? `?scope=${state.scope}` : ''), { headers: authHeaders() });
+    let query = '';
+    if (state.scope === 'friends' || state.scope === 'me') query = '?scope=' + state.scope;
+    else if (state.scope === 'group' && state.groupId) query = '?scope=group&groupId=' + encodeURIComponent(state.groupId);
+    const resp = await fetch('/api/announcements' + query, { headers: authHeaders() });
     if (resp.status === 401) return handleAuthExpired();
+    if (resp.status === 403) {
+      state.scope = 'all';
+      localStorage.setItem('ru_scope', 'all');
+      syncScopeTabs();
+      return;
+    }
     list = await resp.json();
   } catch {
   }
@@ -363,6 +379,9 @@ async function renderTimeline() {
   } else if (state.scope === 'me') {
     emptyTitle.textContent = 'Você ainda não anunciou nada.';
     emptySub.textContent = 'Toque em ➕ Anunciar para avisar o pessoal.';
+  } else if (state.scope === 'group') {
+    emptyTitle.textContent = 'Ninguém anunciou neste grupo ainda.';
+    emptySub.textContent = 'Toque em ➕ Anunciar e escolha o grupo.';
   } else {
     emptyTitle.textContent = 'Ninguém anunciou ainda.';
     emptySub.textContent = 'Quando for, toque em ➕ Anunciar para avisar o pessoal.';
@@ -403,6 +422,12 @@ async function renderTimeline() {
     when.className = 'when';
     when.textContent = `Vai comer no RU ${a.label}`;
     info.append(name, when);
+    if (a.groupName) {
+      const gtag = document.createElement('div');
+      gtag.className = 'course';
+      gtag.textContent = '👥 ' + a.groupName;
+      info.appendChild(gtag);
+    }
     if (a.course) {
       const course = document.createElement('div');
       course.className = 'course';
@@ -518,12 +543,30 @@ function syncModal() {
   for (const chip of $('#chips').children) {
     chip.classList.toggle('selected', state.mode === 'in' && state.minutes === parseInt(chip.dataset.m, 10));
   }
+  syncGroupSelect();
   $('#preview').textContent = `Você vai comer no RU ${arrival().label}`;
+}
+
+function syncGroupSelect() {
+  const sel = $('#announceGroup');
+  if (!sel) return;
+  const prev = state.announceGroup || (state.scope === 'group' ? state.groupId : '');
+  sel.innerHTML = '<option value="">Todos (feed geral)</option>';
+  for (const g of state.groups) {
+    const o = document.createElement('option');
+    o.value = g.id;
+    o.textContent = g.name;
+    sel.appendChild(o);
+  }
+  sel.value = prev;
+  state.announceGroup = sel.value;
 }
 
 function openModal() {
   state.editingId = '';
   $('#announceTitle').textContent = 'Vou comer no RU…';
+  $('#announceGroupWrap').classList.remove('hidden');
+  if (!state.groups.length) fetchMyGroups();
   syncModal();
   $('#modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -532,6 +575,7 @@ function openModal() {
 function openEditModal(a) {
   state.editingId = a.id;
   $('#announceTitle').textContent = 'Editar horário';
+  $('#announceGroupWrap').classList.add('hidden');
   if (a.exact) {
     state.mode = 'exact';
     const d = new Date(a.arrive);
@@ -556,6 +600,7 @@ function closeModal() {
 async function confirmAnnounce() {
   const r = arrival();
   const payload = { when: r.when, arrive: r.arrive, label: r.label };
+  if (!state.editingId && state.announceGroup) payload.groupId = state.announceGroup;
   const isEdit = !!state.editingId;
   $('#confirmBtn').textContent = 'Enviando…';
   $('#confirmBtn').disabled = true;
@@ -611,6 +656,11 @@ function start() {
   $('#scopeAllBtn').addEventListener('click', () => setScope('all'));
   $('#scopeFriendsBtn').addEventListener('click', () => setScope('friends'));
   $('#scopeMeBtn').addEventListener('click', () => setScope('me'));
+  $('#scopeGroupsBtn').addEventListener('click', () => setScope('group'));
+  $('#groupCreate').addEventListener('click', createGroup);
+  $('#groupJoin').addEventListener('click', joinGroup);
+  $('#groupsClose').addEventListener('click', closeGroups);
+  $('#announceGroup').addEventListener('change', (e) => { state.announceGroup = e.target.value; });
   $('#friendSearch').addEventListener('input', onFriendSearch);
   $('#friendsOverlay').addEventListener('click', (e) => {
     const btn = e.target.closest('.mini-act');
@@ -624,6 +674,7 @@ function start() {
   });
   renderTimeline();
   renderMenu();
+  fetchMyGroups();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   enablePush();
 }
@@ -885,12 +936,20 @@ function syncScopeTabs() {
   $('#scopeAllBtn').classList.toggle('active', state.scope === 'all');
   $('#scopeFriendsBtn').classList.toggle('active', state.scope === 'friends');
   $('#scopeMeBtn').classList.toggle('active', state.scope === 'me');
+  $('#scopeGroupsBtn').classList.toggle('active', state.scope === 'group');
+  renderGroupBar();
 }
 
 function setScope(s) {
   state.scope = s;
   localStorage.setItem('ru_scope', s);
   syncScopeTabs();
+  if (s === 'group') {
+    if (state.groups.length && !state.groups.some((g) => g.id === state.groupId)) {
+      state.groupId = state.groups[0].id;
+    }
+    fetchMyGroups();
+  }
   renderTimeline();
 }
 
@@ -1041,6 +1100,211 @@ async function friendAction(action, email) {
     if (state.scope === 'friends') renderTimeline();
   } catch {
     toast('Falha. Tente de novo.');
+  }
+}
+
+async function fetchMyGroups() {
+  try {
+    const resp = await fetch('/api/groups', { headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) return;
+    state.groups = await resp.json();
+  } catch {
+  }
+  if (state.scope === 'group' && state.groups.length && !state.groups.some((g) => g.id === state.groupId)) {
+    state.groupId = state.groups[0].id;
+  }
+  renderGroupBar();
+}
+
+function renderGroupBar() {
+  const bar = $('#groupBar');
+  if (state.scope !== 'group') {
+    bar.classList.add('hidden');
+    bar.innerHTML = '';
+    return;
+  }
+  bar.classList.remove('hidden');
+  bar.innerHTML = '';
+  for (const g of state.groups) {
+    const b = document.createElement('button');
+    b.className = 'tab' + (state.groupId === g.id ? ' active' : '');
+    b.textContent = g.name;
+    b.title = 'Código: ' + g.code;
+    b.addEventListener('click', () => {
+      state.groupId = g.id;
+      syncScopeTabs();
+      renderTimeline();
+    });
+    bar.appendChild(b);
+  }
+  const add = document.createElement('button');
+  add.className = 'tab add-chip';
+  add.textContent = '＋ Novo / Código';
+  add.title = 'Criar grupo ou entrar com código';
+  add.addEventListener('click', openGroups);
+  bar.appendChild(add);
+}
+
+function openGroups() {
+  $('#groupsOverlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  renderGroupsList();
+}
+
+function closeGroups() {
+  $('#groupsOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+async function renderGroupsList() {
+  await fetchMyGroups();
+  const wrap = $('#groupsList');
+  wrap.innerHTML = '';
+  if (!state.groups.length) {
+    const p = document.createElement('p');
+    p.className = 'sub friends-hint';
+    p.textContent = 'Você ainda não está em nenhum grupo. Crie um acima ou entre com um código.';
+    wrap.appendChild(p);
+    return;
+  }
+  for (const g of state.groups) {
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+
+    const info = document.createElement('div');
+    info.className = 'f-info';
+    const nm = document.createElement('div');
+    nm.className = 'name';
+    nm.textContent = g.name;
+    const em = document.createElement('div');
+    em.className = 'when';
+    em.textContent = `${g.description ? g.description + ' · ' : ''}${g.memberCount} membro(s) · Código: ${g.code}`;
+    info.append(nm, em);
+
+    const acts = document.createElement('div');
+    acts.className = 'mini-acts';
+    const btn = document.createElement('button');
+    if (g.owner === state.email) {
+      btn.className = 'mini-act ghost';
+      btn.textContent = 'Excluir';
+      btn.title = 'Exclui o grupo e todos os avisos dele';
+      btn.addEventListener('click', () => deleteGroup(g.id));
+    } else {
+      btn.className = 'mini-act ghost';
+      btn.textContent = 'Sair';
+      btn.addEventListener('click', () => leaveGroup(g.id));
+    }
+    acts.appendChild(btn);
+
+    row.append(info, acts);
+    wrap.appendChild(row);
+  }
+}
+
+async function createGroup() {
+  const name = $('#groupName').value.trim();
+  if (!name) return toast('Dê um nome ao grupo.');
+  const btn = $('#groupCreate');
+  btn.disabled = true;
+  btn.textContent = 'Criando…';
+  try {
+    const resp = await fetch('/api/groups', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ name, description: $('#groupDesc').value.trim() }),
+    });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      return toast(j.error || 'Falha ao criar grupo.');
+    }
+    const g = await resp.json();
+    $('#groupName').value = '';
+    $('#groupDesc').value = '';
+    toast(`Grupo criado! Código: ${g.code}`);
+    await fetchMyGroups();
+    state.scope = 'group';
+    state.groupId = g.id;
+    localStorage.setItem('ru_scope', 'group');
+    syncScopeTabs();
+    renderGroupsList();
+    renderTimeline();
+  } catch {
+    toast('Falha ao criar grupo.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Criar grupo';
+}
+
+async function joinGroup() {
+  const code = $('#groupCodeInput').value.trim().toUpperCase();
+  if (!code) return toast('Digite o código.');
+  const btn = $('#groupJoin');
+  btn.disabled = true;
+  btn.textContent = 'Entrando…';
+  try {
+    const resp = await fetch('/api/groups/join', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ code }),
+    });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      return toast(j.error || 'Código inválido.');
+    }
+    const g = await resp.json();
+    $('#groupCodeInput').value = '';
+    toast(`Você entrou em ${g.name}!`);
+    await fetchMyGroups();
+    state.groupId = g.id;
+    state.scope = 'group';
+    localStorage.setItem('ru_scope', 'group');
+    syncScopeTabs();
+    renderGroupsList();
+    renderTimeline();
+  } catch {
+    toast('Falha ao entrar no grupo.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Entrar no grupo';
+}
+
+async function leaveGroup(id) {
+  try {
+    const resp = await fetch(`/api/groups/${id}/leave`, { method: 'POST', headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      return toast(j.error || 'Falha ao sair do grupo.');
+    }
+    toast('Você saiu do grupo.');
+    await fetchMyGroups();
+    if (state.groupId === id) state.groupId = state.groups[0] ? state.groups[0].id : '';
+    renderGroupsList();
+    if (state.scope === 'group') renderTimeline();
+  } catch {
+    toast('Falha ao sair do grupo.');
+  }
+}
+
+async function deleteGroup(id) {
+  if (!confirm('Excluir o grupo e todos os avisos dele?')) return;
+  try {
+    const resp = await fetch(`/api/groups/${id}`, { method: 'DELETE', headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      return toast(j.error || 'Falha ao excluir o grupo.');
+    }
+    toast('Grupo excluído.');
+    await fetchMyGroups();
+    if (state.groupId === id) state.groupId = state.groups[0] ? state.groups[0].id : '';
+    renderGroupsList();
+    if (state.scope === 'group') renderTimeline();
+  } catch {
+    toast('Falha ao excluir o grupo.');
   }
 }
 

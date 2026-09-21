@@ -40,7 +40,9 @@
       <button id="scopeAllBtn" class="tab active">Todos</button>
       <button id="scopeFriendsBtn" class="tab">Amigos</button>
       <button id="scopeMeBtn" class="tab">Meus avisos</button>
+      <button id="scopeGroupsBtn" class="tab">Grupos</button>
     </div>
+    <div id="groupBar" class="group-bar hidden"></div>
     <section id="timeline"></section>
     <div id="empty" class="empty hidden">
       <div class="empty-emoji">🍃</div>
@@ -84,6 +86,9 @@
     <div class="sheet">
       <div class="sheet-grab"></div>
       <h2 id="announceTitle">Vou comer no RU…</h2>
+      <div id="announceGroupWrap" class="group-select">
+        <select id="announceGroup"></select>
+      </div>
       <div class="tabs">
         <button id="tabIn" class="tab active">Em quanto tempo?</button>
         <button id="tabExact" class="tab">Hora exata</button>
@@ -135,6 +140,28 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <div id="groupsOverlay" class="overlay center hidden">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2>👥 Grupos</h2>
+      <p class="sub friends-sub">Crie um grupo e compartilhe o código para os colegas entrarem. Todo membro pode anunciar.</p>
+      <div class="friend-sections">
+        <div class="day-group">Seus grupos</div>
+        <div id="groupsList" class="friend-rows"></div>
+      </div>
+      <div class="day-group">Criar grupo</div>
+      <input id="groupName" type="text" placeholder="Nome do grupo (ex: Turma 2026)…" autocomplete="off">
+      <input id="groupDesc" type="text" placeholder="Descrição (opcional)…" autocomplete="off">
+      <button id="groupCreate" class="primary wide">Criar grupo</button>
+      <div class="day-group">Entrar com código</div>
+      <input id="groupCodeInput" type="text" placeholder="Código (ex: ABC234)…" autocomplete="off">
+      <button id="groupJoin" class="ghost wide">Entrar no grupo</button>
+      <div class="actions">
+        <button id="groupsClose" class="ghost wide">Fechar</button>
+      </div>
     </div>
   </div>
 
