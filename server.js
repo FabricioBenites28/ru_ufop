@@ -619,12 +619,18 @@ app.post('/api/menu', requireAuth, (req, res, next) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'data inválida' });
   const items = Array.isArray(req.body.items)
     ? req.body.items
-        .map((i) => ({
-          text: String(i.text || '').trim().slice(0, 80),
-          veg: !!i.veg,
-          lactose: !!i.lactose,
-          aviso: !!i.aviso,
-        }))
+        .map((i) => {
+          const type = String(i.type || '');
+          const mark = Number(i.mark);
+          return {
+            text: String(i.text || '').trim().slice(0, 80),
+            veg: !!i.veg,
+            lactose: !!i.lactose,
+            aviso: !!i.aviso || (Number.isFinite(mark) && mark >= 1),
+            type: ['', 'ref1', 'ref2', 'aviso', 'veg'].includes(type) ? type : '',
+            mark: Number.isFinite(mark) && mark >= 0 && mark <= 9 ? Math.floor(mark) : 0,
+          };
+        })
         .filter((i) => i.text)
     : [];
   if (!items.length) return res.status(400).json({ error: 'cardápio vazio' });
