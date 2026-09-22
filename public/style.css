@@ -771,6 +771,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .tag.aviso { background: var(--amber-soft); color: var(--amber); }
 
 .menu-items li.aviso-line { color: var(--amber); font-weight: 600; }
+.menu-items li.ref-line { color: var(--amber); }
+.menu-items li.ref2-line { color: var(--red); }
 
 .empty-menu { text-align: center; padding: var(--s6); }
 .empty-menu .menu-title { margin-bottom: var(--s1); }

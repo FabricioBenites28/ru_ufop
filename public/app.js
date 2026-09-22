@@ -664,9 +664,17 @@ function parseMenuText(raw) {
   const items = [];
   for (const line of lines) {
     if (/card[aá]pio\s+do\s+(alm[oô]ço|jantar)/i.test(line)) continue;
-    const aviso = /\*/g.test(line);
-    const clean = line
-      .replace(/^[•\-\*\s]+/, '')
+    const noBullet = line.replace(/^\s*[•\-\s]+\s*/, '');
+    const trailingStars = (noBullet.match(/\*+$/)?.[0] || '').length;
+    const type = /^aviso\s*\d*\s*[:.\-]?\s*/i.test(noBullet) || /^\*/.test(noBullet)
+      ? 'aviso'
+      : trailingStars >= 2
+        ? 'ref2'
+        : trailingStars === 1
+          ? 'ref1'
+          : '';
+    const clean = noBullet
+      .replace(/^\*+/, '')
       .replace(/[*]+$/g, '')
       .replace(/\s+/g, ' ')
       .trim();
@@ -674,7 +682,7 @@ function parseMenuText(raw) {
     items.push({
       text: clean,
       veg: /vegetariano/i.test(clean),
-      aviso,
+      type,
     });
   }
   return { meal, date, dateLabel, items };
@@ -687,12 +695,17 @@ function tagify(li, item) {
     s.textContent = 'vegetariano';
     li.appendChild(s);
   }
-  if (item.aviso) {
+  const type = item.type || (item.aviso ? 'aviso' : '');
+  if (type === 'aviso') {
     li.classList.add('aviso-line');
     const s = document.createElement('span');
     s.className = 'tag aviso';
     s.textContent = 'aviso';
     li.appendChild(s);
+  } else if (type === 'ref1') {
+    li.classList.add('ref-line');
+  } else if (type === 'ref2') {
+    li.classList.add('ref2-line');
   } else if (item.lactose) {
     const s = document.createElement('span');
     s.className = 'tag lac';
