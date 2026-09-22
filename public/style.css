@@ -500,7 +500,7 @@ main {
   font-weight: 700;
 }
 
-/* ===================== tabs / chips ===================== */
+/* ===================== tabs ===================== */
 
 .tabs {
   display: flex;
@@ -530,35 +530,6 @@ main {
   background: var(--primary-soft);
   color: var(--primary);
 }
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-}
-
-.chip {
-  background: var(--surface-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  padding: 10px 18px;
-  font-size: 14px;
-  font-family: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .12s ease;
-}
-
-.chip:active { transform: scale(.97); }
-
-.chip.selected {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-color: transparent;
-}
-
-/* ===================== inputs ===================== */
 
 input[type="time"],
 input[type="email"],
@@ -997,7 +968,6 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   #menuText { font-size: 14px; padding: 12px; }
   .fab { font-size: 15px; padding: 15px 24px; }
   .brand-name { font-size: 15.5px; }
-  .panel .chips .chip { padding: 9px 15px; }
   .friend-row { flex-wrap: wrap; }
   .mini-acts { margin-left: auto; }
 }

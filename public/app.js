@@ -1,6 +1,5 @@
 const $ = (s) => document.querySelector(s);
 
-const MODAL_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120];
 const DAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const MENU_EDITOR_EMAIL = 'carlos.rodriguez@aluno.ufop.edu.br';
 const state = {
@@ -10,8 +9,6 @@ const state = {
   photo: localStorage.getItem('ru_photo') || '',
   course: localStorage.getItem('ru_course') || '',
   started: false,
-  mode: 'in',
-  minutes: 30,
   exact: '19:00',
   menuTab: null,
   pendingMenu: null,
@@ -46,7 +43,6 @@ const ICONS = {
   users: icon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
   user: icon('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
   pencil: icon('<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>', 14),
-  refresh: icon('<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>', 14),
 };
 
 function authHeaders() {
@@ -505,29 +501,8 @@ async function renderTimeline() {
   }
 }
 
-function buildChips() {
-  const wrap = $('#chips');
-  wrap.innerHTML = '';
-  for (const m of MODAL_MINUTES) {
-    const btn = document.createElement('button');
-    btn.dataset.m = m;
-    btn.className = 'chip' + (m === state.minutes ? ' selected' : '');
-    btn.textContent = m >= 60 ? `${m / 60} h` : `${m} min`;
-    btn.addEventListener('click', () => {
-      state.minutes = m;
-      state.mode = 'in';
-      syncModal();
-    });
-    wrap.appendChild(btn);
-  }
-}
-
 function arrival() {
   const now = Date.now();
-  if (state.mode === 'in') {
-    const arrive = new Date(now + state.minutes * 60000);
-    return { when: 'in', arrive: arrive.toISOString(), label: `em ${state.minutes} min` };
-  }
   const [h, m] = state.exact.split(':').map(Number);
   const d = new Date();
   d.setHours(h || 0, m || 0, 0, 0);
@@ -536,14 +511,7 @@ function arrival() {
 }
 
 function syncModal() {
-  $('#tabIn').classList.toggle('active', state.mode === 'in');
-  $('#tabExact').classList.toggle('active', state.mode === 'exact');
-  $('#panelIn').classList.toggle('hidden', state.mode !== 'in');
-  $('#panelExact').classList.toggle('hidden', state.mode !== 'exact');
   $('#exactTime').value = state.exact;
-  for (const chip of $('#chips').children) {
-    chip.classList.toggle('selected', state.mode === 'in' && state.minutes === parseInt(chip.dataset.m, 10));
-  }
   syncGroupSelect();
   $('#preview').textContent = `Você vai comer no RU ${arrival().label}`;
 }
@@ -577,17 +545,8 @@ function openEditModal(a) {
   state.editingId = a.id;
   $('#announceTitle').textContent = 'Editar horário';
   $('#announceGroupWrap').classList.add('hidden');
-  if (a.exact) {
-    state.mode = 'exact';
-    const d = new Date(a.arrive);
-    state.exact = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  } else {
-    state.mode = 'in';
-    state.minutes = MODAL_MINUTES.reduce(
-      (best, m) => (Math.abs(m - a.inMinutes) < Math.abs(best - a.inMinutes) ? m : best),
-      MODAL_MINUTES[0]
-    );
-  }
+  const d = new Date(a.arrive);
+  state.exact = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   syncModal();
   $('#modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -628,12 +587,9 @@ function start() {
   if (state.started) return;
   state.started = true;
 
-  buildChips();
   syncModal();
 
   $('#announceBtn').addEventListener('click', openModal);
-  $('#tabIn').addEventListener('click', () => { state.mode = 'in'; syncModal(); });
-  $('#tabExact').addEventListener('click', () => { state.mode = 'exact'; syncModal(); });
   $('#cancelBtn').addEventListener('click', closeModal);
   $('#confirmBtn').addEventListener('click', confirmAnnounce);
   $('#exactTime').addEventListener('change', (e) => { state.exact = e.target.value; syncModal(); });
@@ -834,23 +790,6 @@ async function saveMenu() {
   $('#menuSave').disabled = false;
 }
 
-async function syncMenu() {
-  try {
-    const resp = await fetch('/api/menu/sync', { method: 'POST', headers: authHeaders() });
-    if (resp.status === 401) return handleAuthExpired();
-    if (resp.status === 403) return toast('Só o editor do cardápio pode sincronizar.');
-    if (!resp.ok) {
-      const j = await resp.json().catch(() => ({}));
-      return toast(j.error || 'Falha ao buscar no site.');
-    }
-    const j = await resp.json();
-    toast(j.changed ? `Cardápio do site atualizado (${j.dateLabel})!` : 'Cardápio já estava atualizado.');
-    renderMenu();
-  } catch {
-    toast('Falha ao buscar no site. Tente de novo.');
-  }
-}
-
 async function renderMenu() {
   let menus = [];
   try {
@@ -878,11 +817,6 @@ async function renderMenu() {
       btn.innerHTML = icon('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 16) + ' Adicionar cardápio';
       btn.onclick = () => openMenuModal();
       card.appendChild(btn);
-      const syncBtn = document.createElement('button');
-      syncBtn.className = 'ghost wide with-icon';
-      syncBtn.innerHTML = ICONS.refresh + ' Buscar no site da UFOP';
-      syncBtn.onclick = syncMenu;
-      card.appendChild(syncBtn);
     }
     container.appendChild(card);
     return;
@@ -912,17 +846,12 @@ async function renderMenu() {
   date.textContent = any ? any.dateLabel : day;
   titles.append(title, date);
   if (canEditMenu()) {
-    const syncBtn = document.createElement('button');
-    syncBtn.className = 'menu-edit';
-    syncBtn.innerHTML = ICONS.refresh;
-    syncBtn.title = 'Buscar cardápio do site da UFOP';
-    syncBtn.onclick = syncMenu;
     const editBtn = document.createElement('button');
     editBtn.className = 'menu-edit';
     editBtn.innerHTML = ICONS.pencil;
     editBtn.title = 'Editar cardápio';
     editBtn.onclick = () => openMenuModal();
-    head.append(titles, syncBtn, editBtn);
+    head.append(titles, editBtn);
   } else {
     head.appendChild(titles);
   }

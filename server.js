@@ -645,126 +645,6 @@ app.post('/api/menu', requireAuth, (req, res, next) => {
   res.json(menu);
 });
 
-// ============ sincronização do cardápio com o site da UFOP ============
-
-const MENU_SOURCE_URL = 'https://ufop.br/cardapio-do-ru';
-const MENU_SYNC_INTERVAL = (Number(process.env.MENU_SYNC_INTERVAL || 30) || 30) * 60 * 1000;
-const MENU_SYNC_CAMPUS = 'Ouro Preto e Mariana';
-
-async function fetchSiteHtml() {
-  const res = await fetch(MENU_SOURCE_URL, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`resposta do site: status ${res.status}`);
-  return await res.text();
-}
-
-function clearMenuItem(raw) {
-  const text = String(raw)
-    .replace(/^[•·\-\*\s]+/, '')
-    .replace(/[*]+$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!text) return null;
-  return { text, veg: /vegetariano/i.test(text), aviso: /\*/.test(String(raw)) };
-}
-
-function leafDivItems(slice) {
-  const items = [];
-  const re = /<div>([^<]*)<\/div>/g;
-  let m;
-  while ((m = re.exec(slice))) {
-    const item = clearMenuItem(m[1]);
-    if (item) items.push(item);
-  }
-  return items;
-}
-
-function parseSyncDay(html) {
-  const dayM = html.match(/<b>\s*([^<]*?)\s*[-\u2013]\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*<\/b>/i);
-  if (!dayM) throw new Error('dia do cardápio não encontrado no site');
-  const dayOfMonth = Number(dayM[2]);
-  const monthLocal = Number(dayM[3]) - 1;
-  let date = new Date(Date.UTC(new Date().getFullYear(), monthLocal, dayOfMonth));
-  const now = new Date();
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.round((date.getTime() - today) / 86400000);
-  if (diff < -180) date = new Date(Date.UTC(date.getUTCFullYear() + 1, monthLocal, dayOfMonth));
-  else if (diff > 180) date = new Date(Date.UTC(date.getUTCFullYear() - 1, monthLocal, dayOfMonth));
-  const iso = date.toISOString().slice(0, 10);
-  const dateLabel = `${String(dayOfMonth).padStart(2, '0')}/${String(monthLocal + 1).padStart(2, '0')} (${dayM[1].trim()})`;
-
-  const idxCampus = html.indexOf(MENU_SYNC_CAMPUS);
-  if (idxCampus === -1) throw new Error(`campus "${MENU_SYNC_CAMPUS}" não encontrado no site`);
-  const tableStart = html.lastIndexOf('<table', idxCampus);
-  if (tableStart === -1) throw new Error('tabela do cardápio não encontrada');
-  const nextTable = html.indexOf('<table', tableStart + 6);
-  const tableEnd = nextTable === -1 ? html.indexOf('</table>', tableStart) + 8 : nextTable;
-  const table = html.slice(tableStart, tableEnd);
-
-  const meals = [];
-  const almoçoIdx = table.search(/Almo[çc]o/i);
-  const jantarIdx = table.search(/Jantar/i);
-  if (almoçoIdx !== -1) {
-    meals.push({ meal: 'almoço', items: leafDivItems(table.slice(almoçoIdx, jantarIdx === -1 ? table.length : jantarIdx)) });
-  }
-  if (jantarIdx !== -1) meals.push({ meal: 'jantar', items: leafDivItems(table.slice(jantarIdx)) });
-
-  if (!meals.length || !meals.some((m) => m.items.length)) {
-    throw new Error('não foi possível extrair os itens do cardápio');
-  }
-  return { date: iso, dateLabel, meals };
-}
-
-async function syncMenuFromSite() {
-  const html = await fetchSiteHtml();
-  const day = parseSyncDay(html);
-  let changed = false;
-  for (const m of day.meals) {
-    const idx = (db.menus || []).findIndex((x) => x.meal === m.meal && x.date === day.date);
-    const existing = idx === -1 ? null : db.menus[idx];
-    if (existing && existing.source === 'sync' && JSON.stringify(existing.items) === JSON.stringify(m.items)) {
-      continue;
-    }
-    const menu = {
-      id: crypto.randomUUID(),
-      meal: m.meal,
-      date: day.date,
-      dateLabel: day.dateLabel,
-      items: m.items,
-      addedBy: 'system',
-      source: 'sync',
-      addedAt: new Date().toISOString(),
-    };
-    if (idx !== -1) db.menus[idx] = menu;
-    else db.menus.push(menu);
-    changed = true;
-  }
-  if (changed) {
-    await save();
-    sendPush('🍽️ Cardápio atualizado', `${day.dateLabel} — publicado no site da UFOP`);
-  }
-  return { date: day.date, dateLabel: day.dateLabel, meals: day.meals.map((m) => m.meal), changed };
-}
-
-async function scheduleMenuSync() {
-  if (process.env.MENU_SYNC_DISABLED === '1') return;
-  const run = () => syncMenuFromSite().catch((err) => console.error('erro ao sincronizar cardápio:', err.message));
-  setTimeout(run, 20 * 1000);
-  setInterval(run, MENU_SYNC_INTERVAL);
-}
-
-app.post('/api/menu/sync', requireAuth, (req, res, next) => {
-  if (req.user.email !== MENU_EDITOR_EMAIL) {
-    return res.status(403).json({ error: 'só o editor do cardápio pode sincronizar' });
-  }
-  next();
-}, async (req, res) => {
-  try {
-    res.json(await syncMenuFromSite());
-  } catch (err) {
-    res.status(502).json({ error: 'não consegui buscar o cardápio do site: ' + String(err.message || err).slice(0, 160) });
-  }
-});
-
 app.post('/api/subscribe', async (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'assinatura inválida' });
@@ -1045,7 +925,6 @@ app.delete('/api/groups/:id', requireAuth, async (req, res) => {
 
 loadData().then(() => {
   app.listen(PORT, () => {
-    scheduleMenuSync();
     console.log(`RU UFOP rodando na porta ${PORT}`);
     if (redis) {
       console.log('persistência: Upstash Redis');
