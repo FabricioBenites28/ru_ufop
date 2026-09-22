@@ -683,6 +683,7 @@ function parseMenuText(raw) {
       text: clean,
       veg: /vegetariano/i.test(clean),
       type,
+      mark: type === 'ref1' ? 1 : type === 'ref2' ? 2 : 0,
     });
   }
   return { meal, date, dateLabel, items };
@@ -695,7 +696,9 @@ function tagify(li, item) {
     s.textContent = 'vegetariano';
     li.appendChild(s);
   }
-  const type = item.type === 'aviso' ? 'ref1' : item.type || (item.aviso ? 'ref1' : '');
+  const type = item.mark != null
+    ? (item.mark >= 2 ? 'ref2' : item.mark === 1 ? 'ref1' : '')
+    : (item.type === 'aviso' ? 'ref1' : item.type || (item.aviso ? 'ref1' : ''));
   if (type === 'ref1') {
     li.classList.add('ref-line');
     const s = document.createElement('span');
