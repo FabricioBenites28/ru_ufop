@@ -675,10 +675,8 @@ function parseMenuText(raw) {
       .replace(/\s+/g, ' ')
       .trim();
     if (!clean) continue;
-    const isVegLine = /^(vegetarian\w*|veg)\s*[:.)]/i.test(clean);
     let type = '';
-    if (isVegLine) type = 'veg';
-    else if (stars >= 2) type = 'ref2';
+    if (stars >= 2) type = 'ref2';
     else if (stars === 1) type = 'ref1';
     else if (/^aviso\s*\d*\s*[:.\-]?\s*/i.test(clean)) type = 'ref1';
     items.push({
@@ -698,9 +696,7 @@ function tagify(li, item) {
     li.appendChild(s);
   }
   const type = item.type === 'aviso' ? 'ref1' : item.type || (item.aviso ? 'ref1' : '');
-  if (type === 'veg') {
-    li.classList.add('veg-line');
-  } else if (type === 'ref1') {
+  if (type === 'ref1') {
     li.classList.add('ref-line');
     const s = document.createElement('span');
     s.className = 'tag aviso';
