@@ -1,6 +1,20 @@
 const $ = (s) => document.querySelector(s);
 
 const DAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+const TIME_WINDOWS = [
+  { start: '10:30', end: '13:30', label: '10:30–13:30' },
+  { start: '18:00', end: '19:30', label: '18:00–19:30' },
+];
+
+function toMinutes(t) {
+  const [h, m] = String(t || '').split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function validTime(t) {
+  const min = toMinutes(t);
+  return TIME_WINDOWS.some((w) => min >= toMinutes(w.start) && min <= toMinutes(w.end));
+}
 const MENU_EDITOR_EMAIL = 'carlos.rodriguez@aluno.ufop.edu.br';
 const state = {
   session: localStorage.getItem('ru_session') || '',
@@ -558,6 +572,10 @@ function closeModal() {
 }
 
 async function confirmAnnounce() {
+  if (!validTime(state.exact)) {
+    toast('Escolha um horário entre ' + TIME_WINDOWS.map((w) => w.label).join(' ou ') + '.');
+    return;
+  }
   const r = arrival();
   const payload = { when: r.when, arrive: r.arrive, label: r.label };
   if (!state.editingId && state.announceGroup) payload.groupId = state.announceGroup;
@@ -592,7 +610,16 @@ function start() {
   $('#announceBtn').addEventListener('click', openModal);
   $('#cancelBtn').addEventListener('click', closeModal);
   $('#confirmBtn').addEventListener('click', confirmAnnounce);
-  $('#exactTime').addEventListener('change', (e) => { state.exact = e.target.value; syncModal(); });
+  $('#exactTime').addEventListener('change', (e) => {
+    const t = e.target.value;
+    if (!validTime(t)) {
+      toast('Escolha um horário entre ' + TIME_WINDOWS.map((w) => w.label).join(' ou ') + '.');
+      $('#exactTime').value = state.exact;
+    } else {
+      state.exact = t;
+    }
+    syncModal();
+  });
 
   $('#menuCancel').addEventListener('click', closeMenuModal);
   $('#menuNext').addEventListener('click', menuNext);
