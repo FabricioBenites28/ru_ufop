@@ -26,17 +26,28 @@ const state = {
 const canEditMenu = () => state.email === MENU_EDITOR_EMAIL;
 
 const COURSES = [
-  'Arquitetura e Urbanismo', 'Artes Cênicas', 'Ciência da Computação',
-  'Ciência e Tecnologia de Alimentos', 'Ciências Biológicas', 'Direito',
+  'Administração', 'Arquitetura e Urbanismo', 'Artes Cênicas', 'Ciência da Computação',
+  'Ciência e Tecnologia de Alimentos', 'Ciências Biológicas', 'Ciências Econômicas', 'Direito',
   'Educação Física', 'Estatística e Ciência de Dados', 'Farmácia', 'Filosofia',
   'Física', 'Engenharia Ambiental', 'Engenharia Civil',
   'Engenharia de Controle e Automação', 'Engenharia de Minas',
   'Engenharia de Produção', 'Engenharia Geológica', 'Engenharia Mecânica',
-  'Engenharia Metalúrgica', 'Engenharia Urbana', 'Inteligência Artificial',
-  'Matemática', 'Medicina', 'Museologia', 'Música', 'Nutrição', 'Química',
-  'Química Industrial', 'Turismo',
+  'Engenharia Metalúrgica', 'Engenharia Urbana', 'História', 'Inteligência Artificial',
+  'Jornalismo', 'Letras', 'Matemática', 'Medicina', 'Museologia', 'Música', 'Nutrição',
+  'Pedagogia', 'Química', 'Química Industrial', 'Serviço Social', 'Turismo',
 ];
 const COURSE_OPTIONS = COURSES.map((c) => `<option value="${c}">${c}</option>`).join('');
+
+const icon = (inner, size = 18) =>
+  `<svg class="icon icon-${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+
+const ICONS = {
+  bell: icon('<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'),
+  users: icon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+  user: icon('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  pencil: icon('<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>', 14),
+  refresh: icon('<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>', 14),
+};
 
 function authHeaders() {
   const headers = { 'Content-Type': 'application/json' };
@@ -61,7 +72,7 @@ function applyProfile(p) {
     img.alt = 'perfil';
     pb.appendChild(img);
   } else {
-    pb.textContent = '👤';
+    pb.innerHTML = ICONS.user;
   }
   pb.classList.remove('hidden');
   $('#logoutBtn').classList.remove('hidden');
@@ -186,16 +197,6 @@ function openNotifs() {
   $('#notifOverlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   renderNotifState();
-  fetch('/api/vapid')
-    .then((r) => r.json())
-    .then((v) => {
-      if (v.envInvalid) {
-        $('#notifStatus').textContent = '⚠ Chaves VAPID do Render são inválidas. Pegue um par válido, cole em VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY e redeploye.';
-      } else if (!v.envKeys) {
-        $('#notifStatus').textContent = '⚠ Servidor sem chaves VAPID fixas. Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no Render para as notificações funcionarem.';
-      }
-    })
-    .catch(() => {});
 }
 
 function closeNotifs() {
@@ -219,12 +220,12 @@ function renderNotifState() {
     return;
   }
   if (Notification.permission === 'granted') {
-    $('#notifStatus').textContent = 'Notificações ativas neste navegador. ✔';
+    $('#notifStatus').textContent = 'Notificações ativas neste navegador.';
     btn.textContent = 'Verificar / atualizar inscrição';
     test.classList.remove('hidden');
   } else if (Notification.permission === 'denied') {
     $('#notifStatus').textContent = 'Notificações bloqueadas neste navegador.';
-    hint.textContent = 'Libere as notificações nas configurações do navegador (ícone de cadeado 🔒 ao lado do endereço) e volte aqui para ativar.';
+    hint.textContent = 'Libere as notificações nas configurações do navegador (ícone de cadeado ao lado do endereço) e volte aqui para ativar.';
     hint.classList.remove('hidden');
     return;
   } else {
@@ -286,7 +287,7 @@ async function enableNotifs() {
     const sub = await getCurrentPush(reg);
     const ok = await storeSubscription(sub);
     if (ok) {
-      toast('Notificações ativadas! 🔔');
+      toast('Notificações ativadas!');
       enablePush();
     } else {
       toast('Não foi possível registrar este navegador (inscrição não aceita). Tente de novo.');
@@ -323,7 +324,7 @@ async function sendTestPush() {
     if (j.total === 0) {
       toast('Sem inscrição de push. Toque em Ativar e permita a notificação.');
     } else if (j.ok > 0) {
-      toast('Notificação de teste enviada! 🔔 Confira seu celular.');
+      toast('Notificação de teste enviada! Confira seu celular.');
     } else {
       const codes = (j.errorCodes || []).join(',');
       if (codes.includes(401) || /VAPID|mismatch/i.test((j.errors || []).join(' '))) {
@@ -375,16 +376,16 @@ async function renderTimeline() {
   const emptySub = empty.querySelector('.sub');
   if (state.scope === 'friends') {
     emptyTitle.textContent = 'Nada dos seus amigos por aqui.';
-    emptySub.textContent = 'Peça para eles anunciarem — ou adicione mais amigos. 👥';
+    emptySub.textContent = 'Peça para eles anunciarem — ou adicione mais amigos.';
   } else if (state.scope === 'me') {
     emptyTitle.textContent = 'Você ainda não anunciou nada.';
-    emptySub.textContent = 'Toque em ➕ Anunciar para avisar o pessoal.';
+    emptySub.textContent = 'Toque em + Anunciar para avisar o pessoal.';
   } else if (state.scope === 'group') {
     emptyTitle.textContent = 'Ninguém anunciou neste grupo ainda.';
-    emptySub.textContent = 'Toque em ➕ Anunciar e escolha o grupo.';
+    emptySub.textContent = 'Toque em + Anunciar e escolha o grupo.';
   } else {
     emptyTitle.textContent = 'Ninguém anunciou ainda.';
-    emptySub.textContent = 'Quando for, toque em ➕ Anunciar para avisar o pessoal.';
+    emptySub.textContent = 'Quando for, toque em + Anunciar para avisar o pessoal.';
   }
   empty.classList.toggle('hidden', list.length > 0);
 
@@ -425,7 +426,7 @@ async function renderTimeline() {
     if (a.groupName) {
       const gtag = document.createElement('div');
       gtag.className = 'course';
-      gtag.textContent = '👥 ' + a.groupName;
+      gtag.textContent = a.groupName;
       info.appendChild(gtag);
     }
     if (a.course) {
@@ -443,7 +444,7 @@ async function renderTimeline() {
     if (a.email === state.email) {
       const edit = document.createElement('button');
       edit.className = 'edit-ann';
-      edit.textContent = '✏️';
+      edit.innerHTML = ICONS.pencil;
       edit.title = 'Editar horário';
       edit.addEventListener('click', () => openEditModal(a));
       card.appendChild(edit);
@@ -490,7 +491,7 @@ async function renderTimeline() {
       const btn = document.createElement('button');
       if (iJoined) {
         btn.className = 'mini-act joined';
-        btn.textContent = 'Você vai ✔';
+        btn.innerHTML = icon('<polyline points="20 6 9 17 4 12"/>', 14) + ' Você vai';
         btn.addEventListener('click', () => unjoinEvent(a.id));
       } else {
         btn.className = 'mini-act primary';
@@ -614,7 +615,7 @@ async function confirmAnnounce() {
     if (!resp.ok) throw new Error('invalid');
     state.editingId = '';
     closeModal();
-    toast(isEdit ? 'Horário atualizado! 🔔' : 'Aviso enviado! 🔔');
+    toast(isEdit ? 'Horário atualizado!' : 'Aviso enviado!');
     renderTimeline();
   } catch {
     toast('Falha ao enviar. Tente de novo.');
@@ -734,7 +735,7 @@ function tagify(li, item) {
     li.classList.add('aviso-line');
     const s = document.createElement('span');
     s.className = 'tag aviso';
-    s.textContent = '⚠ aviso';
+    s.textContent = 'aviso';
     li.appendChild(s);
   } else if (item.lactose) {
     const s = document.createElement('span');
@@ -824,13 +825,30 @@ async function saveMenu() {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
     closeMenuModal();
-    toast('Cardápio publicado! 🍽️');
+    toast('Cardápio publicado!');
     renderMenu();
   } catch {
     toast('Falha ao publicar. Tente de novo.');
   }
   $('#menuSave').textContent = 'Publicar';
   $('#menuSave').disabled = false;
+}
+
+async function syncMenu() {
+  try {
+    const resp = await fetch('/api/menu/sync', { method: 'POST', headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (resp.status === 403) return toast('Só o editor do cardápio pode sincronizar.');
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      return toast(j.error || 'Falha ao buscar no site.');
+    }
+    const j = await resp.json();
+    toast(j.changed ? `Cardápio do site atualizado (${j.dateLabel})!` : 'Cardápio já estava atualizado.');
+    renderMenu();
+  } catch {
+    toast('Falha ao buscar no site. Tente de novo.');
+  }
 }
 
 async function renderMenu() {
@@ -849,17 +867,22 @@ async function renderMenu() {
     card.className = 'card menu';
     const title = document.createElement('div');
     title.className = 'menu-title';
-    title.textContent = '🍽️ Cardápio';
+    title.textContent = 'Cardápio';
     const sub = document.createElement('p');
     sub.className = 'sub';
     sub.textContent = 'O cardápio de hoje vem do Telegram. Dá pra colar aqui pra todo mundo ver.';
     card.append(title, sub);
     if (canEditMenu()) {
       const btn = document.createElement('button');
-      btn.className = 'primary';
-      btn.textContent = 'Adicionar cardápio';
+      btn.className = 'primary with-icon';
+      btn.innerHTML = icon('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 16) + ' Adicionar cardápio';
       btn.onclick = () => openMenuModal();
       card.appendChild(btn);
+      const syncBtn = document.createElement('button');
+      syncBtn.className = 'ghost wide with-icon';
+      syncBtn.innerHTML = ICONS.refresh + ' Buscar no site da UFOP';
+      syncBtn.onclick = syncMenu;
+      card.appendChild(syncBtn);
     }
     container.appendChild(card);
     return;
@@ -882,19 +905,24 @@ async function renderMenu() {
   const titles = document.createElement('div');
   const title = document.createElement('div');
   title.className = 'menu-title';
-  title.textContent = '🍽️ Cardápio';
+  title.textContent = 'Cardápio';
   const date = document.createElement('div');
   date.className = 'menu-date';
   const any = almoço || jantar;
   date.textContent = any ? any.dateLabel : day;
   titles.append(title, date);
   if (canEditMenu()) {
+    const syncBtn = document.createElement('button');
+    syncBtn.className = 'menu-edit';
+    syncBtn.innerHTML = ICONS.refresh;
+    syncBtn.title = 'Buscar cardápio do site da UFOP';
+    syncBtn.onclick = syncMenu;
     const editBtn = document.createElement('button');
     editBtn.className = 'menu-edit';
-    editBtn.textContent = '✏️';
+    editBtn.innerHTML = ICONS.pencil;
     editBtn.title = 'Editar cardápio';
     editBtn.onclick = () => openMenuModal();
-    head.append(titles, editBtn);
+    head.append(titles, syncBtn, editBtn);
   } else {
     head.appendChild(titles);
   }
@@ -1317,7 +1345,7 @@ async function joinEvent(id) {
       toast(j.error || 'Falha ao entrar.');
       return;
     }
-    toast('Você vai junto! 🔔');
+    toast('Você vai junto!');
     renderTimeline();
   } catch {
     toast('Falha. Tente de novo.');
@@ -1437,7 +1465,7 @@ function openCourseSheet(required) {
   }
   $('#courseName').textContent = state.name;
   $('#courseMsg').textContent = required
-    ? 'Conta pra gente seu curso pra confirmar. 🎓'
+    ? 'Conta pra gente seu curso pra confirmar.'
     : 'Seu perfil: mude a foto ou o curso quando quiser.';
   $('#courseInput').value = COURSES.includes(state.course) ? state.course : '';
   $('#courseError').classList.add('hidden');
@@ -1471,7 +1499,7 @@ async function saveCourse() {
     const p = await resp.json();
     applyProfile(p);
     closeCourseSheet();
-    toast('Perfil atualizado! 🎓');
+    toast('Perfil atualizado!');
   } catch {
     toast('Falha ao salvar. Tente de novo.');
   }

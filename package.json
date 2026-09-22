@@ -4,7 +4,8 @@
   "description": "Avisos do RU - quem vai comer quando",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test-persistence.js"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.4",
