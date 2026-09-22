@@ -664,21 +664,23 @@ function parseMenuText(raw) {
   const items = [];
   for (const line of lines) {
     if (/card[aá]pio\s+do\s+(alm[oô]ço|jantar)/i.test(line)) continue;
-    const noBullet = line.replace(/^\s*[•\-\s]+\s*/, '');
-    const trailingStars = (noBullet.match(/\*+$/)?.[0] || '').length;
-    const type = /^aviso\s*\d*\s*[:.\-]?\s*/i.test(noBullet) || /^\*/.test(noBullet)
-      ? 'aviso'
-      : trailingStars >= 2
-        ? 'ref2'
-        : trailingStars === 1
-          ? 'ref1'
-          : '';
-    const clean = noBullet
+    const trimmed = line.trim();
+    const lead = trimmed.replace(/^[•\-\s.]+/, '');
+    const leadStars = (lead.match(/^\*+/) || [''])[0].length;
+    const trailStars = (trimmed.match(/\*+$/) || [''])[0].length;
+    const stars = Math.max(leadStars, trailStars);
+    const clean = lead
       .replace(/^\*+/, '')
-      .replace(/[*]+$/g, '')
+      .replace(/\*/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     if (!clean) continue;
+    const isVegLine = /^(vegetarian\w*|veg)\s*[:.)]/i.test(clean);
+    let type = '';
+    if (isVegLine) type = 'veg';
+    else if (stars >= 2) type = 'ref2';
+    else if (stars === 1) type = 'ref1';
+    else if (/^aviso\s*\d*\s*[:.\-]?\s*/i.test(clean)) type = 'ref1';
     items.push({
       text: clean,
       veg: /vegetariano/i.test(clean),
@@ -695,15 +697,15 @@ function tagify(li, item) {
     s.textContent = 'vegetariano';
     li.appendChild(s);
   }
-  const type = item.type || (item.aviso ? 'aviso' : '');
-  if (type === 'aviso') {
-    li.classList.add('aviso-line');
+  const type = item.type === 'aviso' ? 'ref1' : item.type || (item.aviso ? 'ref1' : '');
+  if (type === 'veg') {
+    li.classList.add('veg-line');
+  } else if (type === 'ref1') {
+    li.classList.add('ref-line');
     const s = document.createElement('span');
     s.className = 'tag aviso';
     s.textContent = 'aviso';
     li.appendChild(s);
-  } else if (type === 'ref1') {
-    li.classList.add('ref-line');
   } else if (type === 'ref2') {
     li.classList.add('ref2-line');
   } else if (item.lactose) {
