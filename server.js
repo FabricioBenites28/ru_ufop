@@ -255,14 +255,47 @@ function sendNotifications(subs, payload) {
   });
 }
 
-function sendPush(title, body) {
-  sendNotifications(db.subscriptions, JSON.stringify({ title, body }));
+const PUSH_TEXT = {
+  going: { pt: 'Vai comer no RU {label}{group}', en: 'Going to the RU {label}{group}' },
+  updated: { pt: 'Atualizou o horário: vai comer no RU {label}', en: 'Updated the time: going to the RU {label}' },
+  joinsYou: { pt: 'Vai junto com você: {label}', en: 'Joining you: {label}' },
+  arrived: { pt: 'chegou ao RU! {label}', en: 'arrived at the RU! {label}' },
+  friendAccept: { pt: 'aceitou seu pedido de amizade', en: 'accepted your friend request' },
+  friendRequest: { pt: 'te mandou um pedido de amizade', en: 'sent you a friend request' },
+  groupJoin: { pt: 'entrou no grupo {group}', en: 'joined the group {group}' },
+  menuTitle: { pt: '🍽️ Cardápio atualizado', en: '🍽️ Menu updated' },
+};
+
+function pushFill(s, params) {
+  for (const k of Object.keys(params || {})) s = s.split('{' + k + '}').join(String(params[k]));
+  return s;
 }
 
-function sendPushToEmails(emails, title, body) {
+function subLang(sub) {
+  return String((sub && sub.lang) || '').toLowerCase() === 'en' ? 'en' : 'pt';
+}
+
+function sendPushToEmails(emails, who, key, args) {
   const set = new Set((emails || []).map((e) => String(e).trim().toLowerCase()));
   const subs = db.subscriptions.filter((s) => set.has(s.email));
-  if (subs.length) sendNotifications(subs, JSON.stringify({ title, body }));
+  if (!subs.length) return;
+  const byLang = { pt: [], en: [] };
+  for (const s of subs) byLang[subLang(s)].push(s);
+  for (const l of ['pt', 'en']) {
+    if (!byLang[l].length) continue;
+    const body = pushFill(PUSH_TEXT[key][l] || '', args);
+    sendNotifications(byLang[l], JSON.stringify({ title: who, body }));
+  }
+}
+
+function sendPushMenu(meal, dateLabel) {
+  const byLang = { pt: [], en: [] };
+  for (const s of db.subscriptions) byLang[subLang(s)].push(s);
+  const mealName = (l) => (l === 'en' ? (meal === 'jantar' ? 'Dinner' : 'Lunch') : meal === 'jantar' ? 'Jantar' : 'Almoço');
+  for (const l of ['pt', 'en']) {
+    if (!byLang[l].length) continue;
+    sendNotifications(byLang[l], JSON.stringify({ title: PUSH_TEXT.menuTitle[l], body: `${mealName(l)} — ${dateLabel}` }));
+  }
 }
 
 function friendsOfEmail(email) {
@@ -403,16 +436,41 @@ function nameFromEmail(email) {
     .join(' ');
 }
 
+function tzParts(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TZ,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const p = {};
+  for (const part of parts) p[part.type] = part.value;
+  if (p.hour === '24') p.hour = '00';
+  return p;
+}
+
+const OPEN_WINDOWS = [
+  { start: 10 * 60 + 30, end: 13 * 60 + 30 },
+  { start: 18 * 60, end: 19 * 60 + 30 },
+];
+const WEEKDAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
 function arrivalInfo(body) {
   const arrive = new Date(body.arrive);
   if (isNaN(arrive.getTime())) return null;
-  const minutes = Math.max(1, Math.round((arrive.getTime() - Date.now()) / 60000));
+  const p = tzParts(arrive);
+  const week = WEEKDAY[p.weekday];
+  if (week < 1 || week > 5) return null;
+  const minutes = +p.hour * 60 + +p.minute;
+  if (!OPEN_WINDOWS.some((w) => minutes >= w.start && minutes <= w.end)) return null;
+  const inMinutes = Math.max(1, Math.round((arrive.getTime() - Date.now()) / 60000));
   const label = String(body.label || '').trim().slice(0, 40);
   return {
     arrive,
-    inMinutes: minutes,
+    inMinutes,
     exact: body.when !== 'in',
-    label: label || `em ${minutes} min`,
+    label: label || `em ${inMinutes} min`,
   };
 }
 
@@ -560,7 +618,7 @@ app.post('/api/announce', requireAuth, async (req, res) => {
     ? groupMemberEmails(groupId).filter((e) => e && e !== email)
     : friendsOfEmail(email);
   if (pushEmails.length) {
-    sendPushToEmails(pushEmails, name, `Vai comer no RU ${info.label}${groupName ? ` (${groupName})` : ''}`);
+    sendPushToEmails(pushEmails, name, 'going', { label: info.label, group: groupName ? ` (${groupName})` : '' });
   }
   res.json(announcement);
 });
@@ -581,7 +639,7 @@ app.put('/api/announce/:id', requireAuth, async (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   await save();
-  sendPushToEmails(friendsOfEmail(email), name, `Atualizou o horário: vai comer no RU ${info.label}`);
+  sendPushToEmails(friendsOfEmail(email), name, 'updated', { label: info.label });
   res.json(db.announcements[idx]);
 });
 
@@ -604,7 +662,7 @@ app.post('/api/announce/:id/join', requireAuth, async (req, res) => {
     });
     await save();
     if (ann.email) {
-      sendPushToEmails([ann.email], req.user.name || nameFromEmail(req.user.email), `Vai junto com você: ${ann.label}`);
+      sendPushToEmails([ann.email], req.user.name || nameFromEmail(req.user.email), 'joinsYou', { label: ann.label });
     }
   }
   res.json(ann);
@@ -617,6 +675,32 @@ app.delete('/api/announce/:id/join', requireAuth, async (req, res) => {
   ann.joins = ann.joins.filter((j) => j.email !== req.user.email);
   await save();
   res.json(ann);
+});
+
+app.post('/api/announce/:id/arrived', requireAuth, async (req, res) => {
+  const ann = db.announcements.find((a) => a.id === req.params.id);
+  if (!ann) return res.status(404).json({ error: 'aviso não encontrado' });
+  if (new Date(ann.arrive).getTime() <= Date.now()) {
+    return res.status(400).json({ error: 'esse aviso já passou' });
+  }
+  const email = req.user.email;
+  const isAuthor = ann.email === email;
+  const isJoiner = (ann.joins || []).some((j) => j.email === email);
+  if (!isAuthor && !isJoiner) {
+    return res.status(403).json({ error: 'você precisa anunciar ou marcar "vou junto" nesse aviso' });
+  }
+  ann.arrived = Array.isArray(ann.arrived) ? ann.arrived : [];
+  if (!ann.arrived.includes(email)) ann.arrived.push(email);
+  await save();
+  const going = new Set(
+    [ann.email, ...(ann.joins || []).map((j) => j.email)]
+      .filter(Boolean)
+      .map((e) => String(e).trim().toLowerCase())
+  );
+  going.delete(email);
+  const name = req.user.name || nameFromEmail(email);
+  if (going.size) sendPushToEmails([...going], name, 'arrived', { label: ann.label });
+  res.json({ ok: true, arrived: ann.arrived });
 });
 
 app.get('/api/menu', (req, res) => {
@@ -665,7 +749,7 @@ app.post('/api/menu', requireAuth, (req, res, next) => {
   };
   db.menus.push(menu);
   await save();
-  sendPush('🍽️ Cardápio atualizado', `${meal === 'jantar' ? 'Jantar' : 'Almoço'} — ${dateLabel}`);
+  sendPushMenu(meal, dateLabel);
   res.json(menu);
 });
 
@@ -673,7 +757,8 @@ app.post('/api/subscribe', async (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'assinatura inválida' });
   const email = String(sub.email || '').trim().toLowerCase().slice(0, 80);
-  const entry = { ...sub, email };
+  const lang = String(sub.lang || '').toLowerCase() === 'en' ? 'en' : 'pt';
+  const entry = { ...sub, email, lang };
   const i = db.subscriptions.findIndex((s) => s.endpoint === sub.endpoint);
   if (i === -1) db.subscriptions.push(entry);
   else db.subscriptions[i] = entry;
@@ -700,7 +785,8 @@ app.post('/api/test-push', requireAuth, async (req, res) => {
       continue;
     }
     try {
-      await webpush.sendNotification(sub, JSON.stringify({ title: '🔔 RU UFOP', body: 'Suas notificações estão funcionando!' }), pushOptionsFor(sub.endpoint));
+      const body = subLang(sub) === 'en' ? 'Your notifications are working!' : 'Suas notificações estão funcionando!';
+      await webpush.sendNotification(sub, JSON.stringify({ title: '🔔 RU UFOP', body }), pushOptionsFor(sub.endpoint));
       results.push({ ok: true, code: 201 });
     } catch (err) {
       results.push({ ok: false, code: err.statusCode || 500, message: String(err.message || err).slice(0, 200), reason: pushReason(err) });
@@ -833,13 +919,13 @@ app.post('/api/friends', requireAuth, async (req, res) => {
     target.outgoing = target.outgoing.filter((e) => e !== me.email);
     if (!target.friends.includes(me.email)) target.friends.push(me.email);
     await save();
-    sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'aceitou seu pedido de amizade');
+    sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'friendAccept');
     return res.json({ ok: true, state: 'friend' });
   }
   me.outgoing.push(email);
   if (!target.incoming.includes(me.email)) target.incoming.push(me.email);
   await save();
-  sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'te mandou um pedido de amizade');
+  sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'friendRequest');
   res.json({ ok: true, state: 'outgoing' });
 });
 
@@ -854,7 +940,7 @@ app.post('/api/friends/accept', requireAuth, async (req, res) => {
   target.outgoing = target.outgoing.filter((e) => e !== me.email);
   if (!target.friends.includes(me.email)) target.friends.push(me.email);
   await save();
-  sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'aceitou seu pedido de amizade');
+  sendPushToEmails([email], req.user.name || nameFromEmail(req.user.email), 'friendAccept');
   res.json({ ok: true, state: 'friend' });
 });
 
@@ -917,7 +1003,7 @@ app.post('/api/groups/join', requireAuth, async (req, res) => {
   if (g.members.includes(req.user.email)) return res.json(publicGroup(g, req.user.email));
   g.members.push(req.user.email);
   await save();
-  sendPushToEmails([g.owner], req.user.name || nameFromEmail(req.user.email), `entrou no grupo ${g.name}`);
+  sendPushToEmails([g.owner], req.user.name || nameFromEmail(req.user.email), 'groupJoin', { group: g.name });
   res.json(publicGroup(g, req.user.email));
 });
 

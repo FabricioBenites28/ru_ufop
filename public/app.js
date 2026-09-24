@@ -1,6 +1,423 @@
 const $ = (s) => document.querySelector(s);
 
-const DAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+const I18N = {
+  pt: {
+    greet: 'oi, {name}',
+    brandSubDefault: 'quem vai comer?',
+    logout: 'sair',
+    creditsBtn: 'créditos',
+    creditsTitle: 'Créditos',
+    creditsText: 'Ideia: Jordana Roza<br>Desenvolvedor: Carlos Benites (Peru power)',
+    close: 'Fechar',
+    cancel: 'Cancelar',
+    confirm: 'Confirmar',
+    save: 'Salvar',
+    saving: 'Salvando…',
+    back: 'Voltar',
+    edit: 'Editar',
+    remove: 'Remover',
+    sending: 'Enviando…',
+    welcomeTitle: 'Bem-vindo ao RU',
+    welcomeSub: 'Entre com sua conta da UFOP.<br>Somente e-mails @aluno.ufop.edu.br.',
+    googleNotConfigured: 'Login do Google ainda não configurado no servidor.',
+    notUfop: 'Essa conta não é da UFOP. Use seu e-mail @aluno.ufop.edu.br.',
+    loginFailed: 'Falha ao entrar. Tente de novo.',
+    coursePlaceholder: 'Escolha seu curso…',
+    courseRequiredMsg: 'Conta pra gente seu curso pra confirmar.',
+    courseEditMsg: 'Seu perfil: mude a foto ou o curso quando quiser.',
+    courseError: 'Informe seu curso para continuar.',
+    courseSaved: 'Perfil atualizado!',
+    courseSaveFailed: 'Falha ao salvar. Tente de novo.',
+    changePhoto: 'Mudar foto',
+    profileTitle: 'Meu perfil',
+    language: 'Idioma',
+    langPt: 'Português',
+    langEn: 'English',
+    navLabel: 'Navegação',
+    navAll: 'Todos',
+    navFriends: 'Amigos',
+    navGroups: 'Grupos',
+    announce: 'Anunciar',
+    announceTitle: 'Vou comer no RU…',
+    editTime: 'Editar horário',
+    labelAt: 'às',
+    previewGoing: 'Você vai comer no RU {label}',
+    groupAllFeed: 'Todos (feed geral)',
+    hoursSub: 'Segunda a sexta · 10:30–13:30 ou 18:00–19:30.',
+    timeInvalid: 'Escolha um horário entre {windows}.',
+    announceSent: 'Aviso enviado!',
+    announceUpdated: 'Horário atualizado!',
+    announceFailed: 'Falha ao enviar. Tente de novo.',
+    goToRU: 'Vai comer no RU {label}',
+    peopleGoingOne: '{n} pessoa vai',
+    peopleGoingMany: '{n} pessoas vão junto',
+    youAnnounced: 'Você anunciou. A galera pode se unir aqui.',
+    joinBtn: 'Vou junto',
+    joinedBtn: 'Você vai',
+    joinToast: 'Você vai junto!',
+    leftAnnounce: 'Você saiu do aviso.',
+    arrivedBtn: 'Cheguei ao RU',
+    arrivedDone: 'Você chegou',
+    arrivedSent: 'Aviso enviado! Todos que vão ficam sabendo.',
+    arrivedFailed: 'Falha ao avisar que você chegou.',
+    emptyAll: 'Ninguém anunciou ainda.',
+    emptyAllSub: 'Quando for, toque em + Anunciar para avisar o pessoal.',
+    emptyFriends: 'Nada dos seus amigos por aqui.',
+    emptyFriendsSub: 'Peça para eles anunciarem — ou adicione mais amigos.',
+    emptyMe: 'Você ainda não anunciou nada.',
+    emptyMeSub: 'Toque em + Anunciar para avisar o pessoal.',
+    emptyGroup: 'Ninguém anunciou neste grupo ainda.',
+    emptyGroupSub: 'Toque em + Anunciar e escolha o grupo.',
+    dayToday: 'Hoje',
+    dayTomorrow: 'Amanhã',
+    menuTitle: 'Cardápio',
+    menuEmptySub: 'O cardápio de hoje vem do Telegram. Dá pra colar aqui pra todo mundo ver.',
+    addMenu: 'Adicionar cardápio',
+    editMenu: 'Editar cardápio',
+    menuOfDay: 'Cardápio do dia',
+    menuPasteHint: 'Cole o cardápio. Linhas que começam com AVISO 1: viram aviso; pratos com * ou ** no final destacam na mesma cor do aviso.',
+    menuPastePh: 'Cardápio do Jantar - Dia 17/09/2026 (Quinta-feira)\n\n- Cubos de lombo ao molho escuro\n- Arroz branco\n- Arroz integral\n- Feijão\n- Sopa de moranga\n- Vegetariano: hambúrguer de lentilha*\n- Macarrão ao queijo**\n- AVISO 1: *Contém OVO e GLÚTEN*\n- AVISO 2: *Contém LACTOSE e GLÚTEN**',
+    pasteFirst: 'Cole o cardápio primeiro.',
+    whichMeal: 'Qual refeição?',
+    whichMealSub: 'Escolha para qual horário é esse cardápio.',
+    continue: 'Continuar',
+    lunch: 'Almoço',
+    dinner: 'Jantar',
+    menuPreviewTitle: 'Prévia do cardápio',
+    publish: 'Publicar',
+    publishing: 'Publicando…',
+    menuPublished: 'Cardápio publicado!',
+    menuPublishFailed: 'Falha ao publicar. Tente de novo.',
+    noMenuMeal: 'Ainda não tem cardápio desse horário.',
+    itemCount: '{n} itens',
+    friendsTitle: 'Amigos',
+    friendsSub: 'Adicione colegas para ver os avisos só deles no feed Amigos.',
+    searchFriendsPh: 'Buscar por e-mail ou nome…',
+    friendReq: 'Pedidos de amizade',
+    myFriends: 'Meus amigos',
+    requestsSent: 'Pedidos enviados',
+    accept: 'Aceitar',
+    decline: 'Recusar',
+    add: 'Adicionar',
+    cancelReq: 'Cancelar',
+    removeFriend: 'Remover',
+    noOneFound: 'Ninguém com esse nome ou e-mail por aqui.',
+    searchFailed: 'Falha na busca.',
+    friendsLoadFailed: 'Falha ao carregar amigos.',
+    requestSent: 'Pedido de amizade enviado!',
+    nowFriends: 'Agora vocês são amigos!',
+    requestDeclined: 'Pedido recusado.',
+    requestCancelled: 'Pedido cancelado.',
+    friendRemoved: 'Amigo removido.',
+    actionFailed: 'Falha. Tente de novo.',
+    groupsTitle: 'Grupos',
+    groupsSub: 'Crie um grupo e compartilhe o código com os colegas para eles entrarem. Só o criador vê o código e pode remover membros. Todo membro pode anunciar.',
+    yourGroups: 'Seus grupos',
+    createGroup: 'Criar grupo',
+    groupNamePh: 'Nome do grupo (ex: Turma 2026)…',
+    groupDescPh: 'Descrição (opcional)…',
+    joinCode: 'Entrar com código',
+    joinGroupBtn: 'Entrar no grupo',
+    codePh: 'Código (ex: ABC234)…',
+    creating: 'Criando…',
+    joining: 'Entrando…',
+    noGroups: 'Você ainda não está em nenhum grupo. Crie um acima ou entre com um código.',
+    groupNameRequired: 'Dê um nome ao grupo.',
+    groupCreated: 'Grupo criado! Código: {code}',
+    groupCreateFailed: 'Falha ao criar grupo.',
+    codeRequired: 'Digite o código.',
+    enteredGroup: 'Você entrou em {name}!',
+    joinFailed: 'Falha ao entrar no grupo.',
+    leftGroup: 'Você saiu do grupo.',
+    leaveFailed: 'Falha ao sair do grupo.',
+    deleteGroup: 'Excluir',
+    deleteHint: 'Exclui o grupo e todos os avisos dele',
+    leave: 'Sair',
+    membersLabel: 'Membros',
+    memberOne: '{n} membro',
+    memberMany: '{n} membros',
+    codeLabel: 'Código: {code}',
+    creatorLabel: '(criador)',
+    memberRemoved: 'Membro removido do grupo.',
+    memberRemovedFailed: 'Falha ao remover o membro.',
+    deleteGroupConfirm: 'Excluir o grupo e todos os avisos dele?',
+    groupDeleted: 'Grupo excluído.',
+    deleteFailed: 'Falha ao excluir o grupo.',
+    newOrCode: '＋ Novo / Código',
+    notifTitle: 'Notificações',
+    notifUnsupported: 'Seu navegador não suporta notificações.',
+    notifActive: 'Notificações ativas neste navegador.',
+    notifVerify: 'Verificar / atualizar inscrição',
+    notifDenied: 'Notificações bloqueadas neste navegador.',
+    notifDeniedHint: 'Libere as notificações nas configurações do navegador (ícone de cadeado ao lado do endereço) e volte aqui para ativar.',
+    notifEnableMsg: 'Ative para receber cardápio, pedidos de amizade e amigos indo ao RU.',
+    notifIosHint: 'No iPhone/iPad o Safari só envia notificações em apps instalados: toque em Compartilhar ➜ "Adicionar à Tela de Início", abra o app instalado e ative aqui.',
+    notifIosStandaloneHint: 'App instalado! Toque em "Ativar notificações" e permita.',
+    notifEnable: 'Ativar notificações',
+    notifActivating: 'Ativando…',
+    notifTest: 'Enviar notificação de teste',
+    notifSending: 'Enviando…',
+    notifTestSent: 'Notificação de teste enviada! Confira seu celular.',
+    notifNoSub: 'Sem inscrição de push. Toque em Ativar e permita a notificação.',
+    notifEnabled: 'Notificações ativadas!',
+    notifRegisterFailed: 'Não foi possível registrar este navegador (inscrição não aceita). Tente de novo.',
+    notifPermDenied: 'Permissão não concedida.',
+    notifIosFirst: 'No iPhone, instale o app primeiro: Compartilhar ➜ Adicionar à Tela de Início.',
+    notifStaleKey: 'Chave push desatualizada: toque em Ativar para regenerar a inscrição.',
+    notifTestFailed: 'Falhou (código {codes}): {err}',
+    notifTestFailGeneric: 'Falha ao enviar teste.',
+    notifVapidInvalid: 'Chave VAPID do servidor inválida. Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY corretas no Render.',
+    notifSafariBlock: 'Permissão de notificação não permitida neste Safari. Abra pelo ícone instalado.',
+    notifActivationErr: 'Erro de ativação: {msg}',
+    notifListMenu: 'Cardápio do dia publicado',
+    notifListFriendReq: 'Alguém te manda um pedido de amizade',
+    notifListFriendGoing: 'Um amigo anuncia que vai ao RU',
+    notifListJoin: 'Alguém se une a um aviso seu',
+    sessionExpired: 'Sessão expirada. Entre de novo.',
+    logoutTitle: 'Trocar de conta',
+    groupBarAddTitle: 'Criar grupo ou entrar com código',
+    unknownError: 'erro desconhecido',
+    invalidCode: 'Código inválido.',
+    enterFailed: 'Falha ao entrar.',
+    unjoinFailed: 'Falha ao sair.',
+    tagVeg: 'vegetariano',
+    tagWarn: 'aviso',
+    tagLac: 'lactose',
+  },
+  en: {
+    greet: 'hi, {name}',
+    brandSubDefault: "who's eating?",
+    logout: 'logout',
+    creditsBtn: 'credits',
+    creditsTitle: 'Credits',
+    creditsText: 'Idea: Jordana Roza<br>Developer: Carlos Benites (Peru power)',
+    close: 'Close',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+    save: 'Save',
+    saving: 'Saving…',
+    back: 'Back',
+    edit: 'Edit',
+    remove: 'Remove',
+    sending: 'Sending…',
+    welcomeTitle: 'Welcome to the RU',
+    welcomeSub: 'Sign in with your UFOP account.<br>Only @aluno.ufop.edu.br emails.',
+    googleNotConfigured: 'Google login is not configured on the server yet.',
+    notUfop: "That account is not UFOP. Use your @aluno.ufop.edu.br email.",
+    loginFailed: 'Failed to sign in. Try again.',
+    coursePlaceholder: 'Choose your course…',
+    courseRequiredMsg: 'Tell us your course to confirm.',
+    courseEditMsg: 'Your profile: change your photo or course anytime.',
+    courseError: 'Enter your course to continue.',
+    courseSaved: 'Profile updated!',
+    courseSaveFailed: 'Failed to save. Try again.',
+    changePhoto: 'Change photo',
+    profileTitle: 'My profile',
+    language: 'Language',
+    langPt: 'Português',
+    langEn: 'English',
+    navLabel: 'Navigation',
+    navAll: 'Everyone',
+    navFriends: 'Friends',
+    navGroups: 'Groups',
+    announce: 'Announce',
+    announceTitle: 'Going to eat at the RU…',
+    editTime: 'Edit time',
+    labelAt: 'at',
+    previewGoing: "You'll eat at the RU {label}",
+    groupAllFeed: 'Everyone (general feed)',
+    hoursSub: 'Mon–Fri · 10:30 AM–1:30 PM or 6 PM–7:30 PM.',
+    timeInvalid: 'Pick a time between {windows}.',
+    announceSent: 'Announcement sent!',
+    announceUpdated: 'Time updated!',
+    announceFailed: 'Failed to send. Try again.',
+    goToRU: 'Going to the RU {label}',
+    peopleGoingOne: '{n} person going',
+    peopleGoingMany: '{n} people going',
+    youAnnounced: 'You announced it. Friends can join here.',
+    joinBtn: 'Count me in',
+    joinedBtn: "You're in",
+    joinToast: "You're in!",
+    leftAnnounce: 'You left this announcement.',
+    arrivedBtn: 'I arrived at the RU',
+    arrivedDone: 'You arrived',
+    arrivedSent: 'Sent! Everyone going now knows you arrived.',
+    arrivedFailed: "Failed to let them know you arrived.",
+    emptyAll: 'No one has announced yet.',
+    emptyAllSub: 'Heading there? Tap + Announce to let everyone know.',
+    emptyFriends: 'Nothing from your friends here.',
+    emptyFriendsSub: 'Ask them to announce — or add more friends.',
+    emptyMe: "You haven't announced anything yet.",
+    emptyMeSub: 'Tap + Announce to let everyone know.',
+    emptyGroup: 'No one has announced in this group yet.',
+    emptyGroupSub: 'Tap + Announce and pick the group.',
+    dayToday: 'Today',
+    dayTomorrow: 'Tomorrow',
+    menuTitle: 'Menu',
+    menuEmptySub: "Today's menu comes from Telegram. Paste it here so everyone can see it.",
+    addMenu: 'Add menu',
+    editMenu: 'Edit menu',
+    menuOfDay: "Today's menu",
+    menuPasteHint: 'Paste the menu. Lines starting with AVISO 1 become warnings; dishes ending with * or ** get highlighted in the warning color.',
+    menuPastePh: 'Dinner menu - Day 17/09/2026 (Thursday)\n\n- Cubos de lombo ao molho escuro\n- Arroz branco\n- Arroz integral\n- Feijão\n- Sopa de moranga\n- Vegetariano: hambúrguer de lentilha*\n- Macarrão ao queijo**\n- AVISO 1: *Contém OVO e GLÚTEN*\n- AVISO 2: *Contém LACTOSE e GLÚTEN**',
+    pasteFirst: 'Paste the menu first.',
+    whichMeal: 'Which meal?',
+    whichMealSub: 'Pick the meal this menu is for.',
+    continue: 'Continue',
+    lunch: 'Lunch',
+    dinner: 'Dinner',
+    menuPreviewTitle: 'Menu preview',
+    publish: 'Publish',
+    publishing: 'Publishing…',
+    menuPublished: 'Menu published!',
+    menuPublishFailed: 'Failed to publish. Try again.',
+    noMenuMeal: 'No menu for this meal yet.',
+    itemCount: '{n} items',
+    friendsTitle: 'Friends',
+    friendsSub: 'Add classmates to see only their announcements in the Friends feed.',
+    searchFriendsPh: 'Search by email or name…',
+    friendReq: 'Friend requests',
+    myFriends: 'My friends',
+    requestsSent: 'Requests sent',
+    accept: 'Accept',
+    decline: 'Decline',
+    add: 'Add',
+    cancelReq: 'Cancel',
+    removeFriend: 'Remove',
+    noOneFound: 'No one with that name or email here.',
+    searchFailed: 'Search failed.',
+    friendsLoadFailed: 'Failed to load friends.',
+    requestSent: 'Friend request sent!',
+    nowFriends: "You're now friends!",
+    requestDeclined: 'Request declined.',
+    requestCancelled: 'Request cancelled.',
+    friendRemoved: 'Friend removed.',
+    actionFailed: 'Failed. Try again.',
+    groupsTitle: 'Groups',
+    groupsSub: 'Create a group and share the code so classmates can join. Only the creator sees the code and can remove members. Any member can announce.',
+    yourGroups: 'Your groups',
+    createGroup: 'Create group',
+    groupNamePh: 'Group name (ex: Class 2026)…',
+    groupDescPh: 'Description (optional)…',
+    joinCode: 'Join with code',
+    joinGroupBtn: 'Join group',
+    codePh: 'Code (ex: ABC234)…',
+    creating: 'Creating…',
+    joining: 'Joining…',
+    noGroups: "You're not in any group yet. Create one above or join with a code.",
+    groupNameRequired: 'Give the group a name.',
+    groupCreated: 'Group created! Code: {code}',
+    groupCreateFailed: 'Failed to create group.',
+    codeRequired: 'Enter the code.',
+    enteredGroup: 'You joined {name}!',
+    joinFailed: 'Failed to join group.',
+    leftGroup: 'You left the group.',
+    leaveFailed: 'Failed to leave group.',
+    deleteGroup: 'Delete',
+    deleteHint: 'Deletes the group and all its announcements',
+    leave: 'Leave',
+    membersLabel: 'Members',
+    memberOne: '{n} member',
+    memberMany: '{n} members',
+    codeLabel: 'Code: {code}',
+    creatorLabel: '(creator)',
+    memberRemoved: 'Member removed from group.',
+    memberRemovedFailed: 'Failed to remove member.',
+    deleteGroupConfirm: 'Delete the group and all its announcements?',
+    groupDeleted: 'Group deleted.',
+    deleteFailed: 'Failed to delete group.',
+    newOrCode: '＋ New / Code',
+    notifTitle: 'Notifications',
+    notifUnsupported: 'Your browser does not support notifications.',
+    notifActive: 'Notifications active on this browser.',
+    notifVerify: 'Check / update subscription',
+    notifDenied: 'Notifications blocked on this browser.',
+    notifDeniedHint: 'Enable notifications in your browser settings (padlock icon next to the address bar) and come back to activate.',
+    notifEnableMsg: 'Turn on to get menu, friend requests and friends heading to the RU.',
+    notifIosHint: 'On iPhone/iPad, Safari only sends notifications in installed apps: tap Share ➜ "Add to Home Screen", open the installed app and activate here.',
+    notifIosStandaloneHint: 'App installed! Tap "Turn on notifications" and allow.',
+    notifEnable: 'Turn on notifications',
+    notifActivating: 'Activating…',
+    notifTest: 'Send test notification',
+    notifSending: 'Sending…',
+    notifTestSent: 'Test notification sent! Check your phone.',
+    notifNoSub: 'No push subscription. Tap Turn on and allow the notification.',
+    notifEnabled: 'Notifications on!',
+    notifRegisterFailed: "Couldn't register this browser (subscription not accepted). Try again.",
+    notifPermDenied: 'Permission not granted.',
+    notifIosFirst: 'On iPhone, install the app first: Share ➜ Add to Home Screen.',
+    notifStaleKey: 'Stale push key: tap Turn on to regenerate the subscription.',
+    notifTestFailed: 'Failed (code {codes}): {err}',
+    notifTestFailGeneric: 'Failed to send test.',
+    notifVapidInvalid: 'Invalid VAPID key on the server. Set correct VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY on Render.',
+    notifSafariBlock: 'Notification permission not allowed on this Safari. Open it from the installed icon.',
+    notifActivationErr: 'Activation error: {msg}',
+    notifListMenu: 'Today menu published',
+    notifListFriendReq: 'Someone sends you a friend request',
+    notifListFriendGoing: 'A friend announces they are going to the RU',
+    notifListJoin: 'Someone joins one of your announcements',
+    sessionExpired: 'Session expired. Sign in again.',
+    logoutTitle: 'Switch account',
+    groupBarAddTitle: 'Create a group or join with a code',
+    unknownError: 'unknown error',
+    invalidCode: 'Invalid code.',
+    enterFailed: "Couldn't join.",
+    unjoinFailed: "Couldn't leave.",
+    tagVeg: 'vegetarian',
+    tagWarn: 'notice',
+    tagLac: 'lactose',
+  },
+};
+
+let lang = localStorage.getItem('ru_lang');
+if (lang !== 'pt' && lang !== 'en') lang = (navigator.language || '').toLowerCase().startsWith('pt') ? 'pt' : 'en';
+
+function t(key, params) {
+  const table = I18N[lang] || I18N.pt;
+  let s = table[key] !== undefined ? table[key] : I18N.pt[key] !== undefined ? I18N.pt[key] : key;
+  if (params) for (const k of Object.keys(params)) s = s.split('{' + k + '}').join(String(params[k]));
+  return s;
+}
+
+function dayNames() {
+  return lang === 'en'
+    ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    : ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+}
+
+function applyStaticLang() {
+  document.documentElement.lang = lang === 'en' ? 'en' : 'pt-BR';
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach((el) => {
+    el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph')));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+  });
+  const langSel = document.getElementById('langSelect');
+  if (langSel) langSel.value = lang;
+}
+
+function setLang(l) {
+  lang = l === 'en' ? 'en' : 'pt';
+  localStorage.setItem('ru_lang', lang);
+  applyStaticLang();
+  setGreeting();
+  if (state.email) {
+    syncModal();
+    renderTimeline();
+    renderMenu();
+    renderNotifState();
+    renderFriends();
+    renderGroupsList();
+    enablePush().catch(() => {});
+  }
+}
 const TIME_WINDOWS = [
   { start: '10:30', end: '13:30', label: '10:30–13:30' },
   { start: '18:00', end: '19:30', label: '18:00–19:30' },
@@ -15,6 +432,11 @@ function validTime(t) {
   const min = toMinutes(t);
   return TIME_WINDOWS.some((w) => min >= toMinutes(w.start) && min <= toMinutes(w.end));
 }
+
+function timeInvalidMsg() {
+  return t('timeInvalid', { windows: TIME_WINDOWS.map((w) => w.label).join(lang === 'en' ? ' or ' : ' ou ') });
+}
+
 const MENU_EDITOR_EMAIL = 'carlos.rodriguez@aluno.ufop.edu.br';
 const state = {
   session: localStorage.getItem('ru_session') || '',
@@ -90,11 +512,11 @@ function applyProfile(p) {
   $('#friendsBtn').classList.remove('hidden');
   $('#bottomNav').classList.remove('hidden');
   syncScopeTabs();
-  $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
+  setGreeting();
 }
 
 function setGreeting() {
-  $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
+  $('#brandSub').textContent = t('greet', { name: state.name.split(' ')[0] });
 }
 
 function logout() {
@@ -128,7 +550,7 @@ function openLogin() {
 }
 
 function fmtClock(iso) {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString(lang === 'en' ? 'en-US' : 'pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function urlBase64ToUint8Array(base64) {
@@ -172,7 +594,7 @@ async function storeSubscription(sub) {
   const resp = await fetch('/api/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...sub.toJSON(), email: state.email }),
+    body: JSON.stringify({ ...sub.toJSON(), email: state.email, lang }),
   });
   return resp.ok;
 }
@@ -223,58 +645,58 @@ function renderNotifState() {
   test.classList.add('hidden');
   dot.classList.add('hidden');
   btn.classList.remove('hidden');
-  btn.textContent = 'Ativar notificações';
+  btn.textContent = t('notifEnable');
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-    $('#notifStatus').textContent = 'Seu navegador não suporta notificações.';
+    $('#notifStatus').textContent = t('notifUnsupported');
     btn.classList.add('hidden');
     return;
   }
   if (Notification.permission === 'granted') {
-    $('#notifStatus').textContent = 'Notificações ativas neste navegador.';
-    btn.textContent = 'Verificar / atualizar inscrição';
+    $('#notifStatus').textContent = t('notifActive');
+    btn.textContent = t('notifVerify');
     test.classList.remove('hidden');
   } else if (Notification.permission === 'denied') {
-    $('#notifStatus').textContent = 'Notificações bloqueadas neste navegador.';
-    hint.textContent = 'Libere as notificações nas configurações do navegador (ícone de cadeado ao lado do endereço) e volte aqui para ativar.';
+    $('#notifStatus').textContent = t('notifDenied');
+    hint.textContent = t('notifDeniedHint');
     hint.classList.remove('hidden');
     return;
   } else {
-    $('#notifStatus').textContent = 'Ative para receber cardápio, pedidos de amizade e amigos indo ao RU.';
+    $('#notifStatus').textContent = t('notifEnableMsg');
     if (canPush()) dot.classList.remove('hidden');
   }
   if (!isIOS()) return;
   if (!isStandaloneApp()) {
-    hint.textContent = 'No iPhone/iPad o Safari só envia notificações em apps instalados: toque em Compartilhar ➜ “Adicionar à Tela de Início”, abra o app instalado e ative aqui.';
+    hint.textContent = t('notifIosHint');
     hint.classList.remove('hidden');
   } else {
-    hint.textContent = 'App instalado! Toque em “Ativar notificações” e permita.';
+    hint.textContent = t('notifIosStandaloneHint');
     hint.classList.remove('hidden');
   }
 }
 
 function shortErr(err) {
-  const msg = String(err && err.name || err && err.message || err) || 'erro desconhecido';
+  const msg = String(err && err.name || err && err.message || err) || t('unknownError');
   if (/InvalidAccess|InvalidCharacter/i.test(msg)) {
-    return 'Chave VAPID do servidor inválida. Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY corretas no Render.';
+    return t('notifVapidInvalid');
   }
   if (/NotAllowed|abort|SecurityError/i.test(msg)) {
-    return 'Permissão de notificação não permitida neste Safari. Abra pelo ícone instalado.';
+    return t('notifSafariBlock');
   }
-  return 'Erro de ativação: ' + msg.slice(0, 140);
+  return t('notifActivationErr', { msg: msg.slice(0, 140) });
 }
 
 async function enableNotifs() {
   const btn = $('#notifEnable');
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-    toast('Seu navegador não suporta notificações.');
+    toast(t('notifUnsupported'));
     return;
   }
   btn.disabled = true;
   const old = btn.textContent;
-  btn.textContent = 'Ativando…';
+  btn.textContent = t('notifActivating');
   if (isIOS() && !isStandaloneApp()) {
     renderNotifState();
-    toast('No iPhone, instale o app primeiro: Compartilhar ➜ Adicionar à Tela de Início.');
+    toast(t('notifIosFirst'));
     btn.disabled = false;
     btn.textContent = old;
     return;
@@ -282,7 +704,7 @@ async function enableNotifs() {
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') {
     renderNotifState();
-    toast('Permissão não concedida.');
+    toast(t('notifPermDenied'));
     btn.disabled = false;
     btn.textContent = old;
     return;
@@ -297,10 +719,10 @@ async function enableNotifs() {
     const sub = await getCurrentPush(reg);
     const ok = await storeSubscription(sub);
     if (ok) {
-      toast('Notificações ativadas!');
+      toast(t('notifEnabled'));
       enablePush();
     } else {
-      toast('Não foi possível registrar este navegador (inscrição não aceita). Tente de novo.');
+      toast(t('notifRegisterFailed'));
     }
   } catch (err) {
     console.error('push falhou:', err);
@@ -314,7 +736,7 @@ async function enableNotifs() {
 async function sendTestPush() {
   const btn = $('#notifTest');
   btn.disabled = true;
-  btn.textContent = 'Enviando…';
+  btn.textContent = t('notifSending');
   try {
     if (canPush() && Notification.permission === 'granted' && state.email) {
       try {
@@ -332,22 +754,22 @@ async function sendTestPush() {
     if (resp.status === 401) return handleAuthExpired();
     const j = await resp.json();
     if (j.total === 0) {
-      toast('Sem inscrição de push. Toque em Ativar e permita a notificação.');
+      toast(t('notifNoSub'));
     } else if (j.ok > 0) {
-      toast('Notificação de teste enviada! Confira seu celular.');
+      toast(t('notifTestSent'));
     } else {
       const codes = (j.errorCodes || []).join(',');
       if (codes.includes(401) || /VAPID|mismatch/i.test((j.errors || []).join(' '))) {
-        toast('Chave push desatualizada: toque em Ativar para regenerar a inscrição.');
+        toast(t('notifStaleKey'));
       } else {
-        toast('Falhou (código ' + codes + '): ' + ((j.errors || [])[0] || 'erro desconhecido'));
+        toast(t('notifTestFailed', { codes, err: (j.errors || [])[0] || t('unknownError') }));
       }
     }
   } catch {
-    toast('Falha ao enviar teste.');
+    toast(t('notifTestFailGeneric'));
   }
   btn.disabled = false;
-  btn.textContent = 'Enviar notificação de teste';
+  btn.textContent = t('notifTest');
 }
 
 function dayLabel(iso) {
@@ -355,9 +777,9 @@ function dayLabel(iso) {
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  if (d.toDateString() === today.toDateString()) return 'Hoje';
-  if (d.toDateString() === tomorrow.toDateString()) return 'Amanhã';
-  return `${DAYS[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`;
+  if (d.toDateString() === today.toDateString()) return t('dayToday');
+  if (d.toDateString() === tomorrow.toDateString()) return t('dayTomorrow');
+  return `${dayNames()[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`;
 }
 
 async function renderTimeline() {
@@ -385,17 +807,17 @@ async function renderTimeline() {
   const emptyTitle = empty.querySelector('p');
   const emptySub = empty.querySelector('.sub');
   if (state.scope === 'friends') {
-    emptyTitle.textContent = 'Nada dos seus amigos por aqui.';
-    emptySub.textContent = 'Peça para eles anunciarem — ou adicione mais amigos.';
+    emptyTitle.textContent = t('emptyFriends');
+    emptySub.textContent = t('emptyFriendsSub');
   } else if (state.scope === 'me') {
-    emptyTitle.textContent = 'Você ainda não anunciou nada.';
-    emptySub.textContent = 'Toque em + Anunciar para avisar o pessoal.';
+    emptyTitle.textContent = t('emptyMe');
+    emptySub.textContent = t('emptyMeSub');
   } else if (state.scope === 'group') {
-    emptyTitle.textContent = 'Ninguém anunciou neste grupo ainda.';
-    emptySub.textContent = 'Toque em + Anunciar e escolha o grupo.';
+    emptyTitle.textContent = t('emptyGroup');
+    emptySub.textContent = t('emptyGroupSub');
   } else {
-    emptyTitle.textContent = 'Ninguém anunciou ainda.';
-    emptySub.textContent = 'Quando for, toque em + Anunciar para avisar o pessoal.';
+    emptyTitle.textContent = t('emptyAll');
+    emptySub.textContent = t('emptyAllSub');
   }
   empty.classList.toggle('hidden', list.length > 0);
 
@@ -423,6 +845,8 @@ async function renderTimeline() {
     } else {
       avatar.textContent = a.name.trim().charAt(0).toUpperCase();
     }
+    avatar.title = a.name;
+    avatar.addEventListener('click', () => openProfileView(a.name || '', a.photo || '', a.email || ''));
 
     const info = document.createElement('div');
     info.className = 'info';
@@ -431,7 +855,7 @@ async function renderTimeline() {
     name.textContent = a.name;
     const when = document.createElement('div');
     when.className = 'when';
-    when.textContent = `Vai comer no RU ${a.label}`;
+    when.textContent = t('goToRU', { label: a.label });
     info.append(name, when);
     if (a.groupName) {
       const gtag = document.createElement('div');
@@ -455,7 +879,7 @@ async function renderTimeline() {
       const edit = document.createElement('button');
       edit.className = 'edit-ann';
       edit.innerHTML = ICONS.pencil;
-      edit.title = 'Editar horário';
+      edit.title = t('editTime');
       edit.addEventListener('click', () => openEditModal(a));
       card.appendChild(edit);
     }
@@ -481,6 +905,7 @@ async function renderTimeline() {
       } else {
         av.textContent = String(j.name || '?').trim().charAt(0).toUpperCase();
       }
+      av.addEventListener('click', () => openProfileView(j.name || '', j.photo || '', j.email || ''));
       avs.appendChild(av);
     }
     if (joins.length > show.length) {
@@ -494,47 +919,68 @@ async function renderTimeline() {
       const cnt = document.createElement('span');
       cnt.className = 'join-count';
       cnt.textContent = joins.length
-        ? `${joins.length} ${joins.length === 1 ? 'pessoa vai' : 'pessoas vão'} junto`
-        : 'Você anunciou. A galera pode se unir aqui.';
+        ? t(joins.length === 1 ? 'peopleGoingOne' : 'peopleGoingMany', { n: joins.length })
+        : t('youAnnounced');
       foot.appendChild(cnt);
     } else {
       const btn = document.createElement('button');
       if (iJoined) {
         btn.className = 'mini-act joined';
-        btn.innerHTML = icon('<polyline points="20 6 9 17 4 12"/>', 14) + ' Você vai';
+        btn.innerHTML = icon('<polyline points="20 6 9 17 4 12"/>', 14) + ' ' + t('joinedBtn');
         btn.addEventListener('click', () => unjoinEvent(a.id));
       } else {
         btn.className = 'mini-act primary';
-        btn.textContent = 'Vou junto';
+        btn.textContent = t('joinBtn');
         btn.addEventListener('click', () => joinEvent(a.id));
       }
       foot.appendChild(btn);
     }
     card.appendChild(foot);
+
+    const stillOpen = new Date(a.arrive).getTime() > Date.now();
+    const canArrive = stillOpen && (a.email === state.email || joins.some((j) => j.email === state.email));
+    if (canArrive) {
+      const arrivedBar = document.createElement('div');
+      arrivedBar.className = 'arrived-bar';
+      const hasArrived = Array.isArray(a.arrived) && a.arrived.includes(state.email);
+      const btn = document.createElement('button');
+      btn.className = 'mini-act arrived' + (hasArrived ? ' joined' : ' primary');
+      btn.innerHTML = hasArrived
+        ? icon('<polyline points="20 6 9 17 4 12"/>', 14) + ' ' + t('arrivedDone')
+        : t('arrivedBtn');
+      btn.title = t('arrivedSent');
+      btn.addEventListener('click', () => arrivedEvent(a.id, btn));
+      arrivedBar.appendChild(btn);
+      card.appendChild(arrivedBar);
+    }
+
     container.appendChild(card);
   }
 }
 
 function arrival() {
-  const now = Date.now();
+  const now = new Date();
   const [h, m] = state.exact.split(':').map(Number);
-  const d = new Date();
+  const d = new Date(now);
   d.setHours(h || 0, m || 0, 0, 0);
-  if (d.getTime() <= now) d.setDate(d.getDate() + 1);
-  return { when: 'exact', arrive: d.toISOString(), label: `às ${state.exact}` };
+  d.setMilliseconds(0);
+  while (d.getTime() <= now.getTime() || d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() + 1);
+  }
+  return { when: 'exact', arrive: d.toISOString(), label: `${t('labelAt')} ${state.exact}` };
 }
 
 function syncModal() {
   $('#exactTime').value = state.exact;
   syncGroupSelect();
-  $('#preview').textContent = `Você vai comer no RU ${arrival().label}`;
+  $('#preview').textContent = t('previewGoing', { label: arrival().label });
 }
 
 function syncGroupSelect() {
   const sel = $('#announceGroup');
   if (!sel) return;
   const prev = state.announceGroup || (state.scope === 'group' ? state.groupId : '');
-  sel.innerHTML = '<option value="">Todos (feed geral)</option>';
+  sel.innerHTML = `<option value="">${t('groupAllFeed')}</option>`;
   for (const g of state.groups) {
     const o = document.createElement('option');
     o.value = g.id;
@@ -547,7 +993,7 @@ function syncGroupSelect() {
 
 function openModal() {
   state.editingId = '';
-  $('#announceTitle').textContent = 'Vou comer no RU…';
+  $('#announceTitle').textContent = t('announceTitle');
   $('#announceGroupWrap').classList.remove('hidden');
   if (!state.groups.length) fetchMyGroups();
   syncModal();
@@ -557,7 +1003,7 @@ function openModal() {
 
 function openEditModal(a) {
   state.editingId = a.id;
-  $('#announceTitle').textContent = 'Editar horário';
+  $('#announceTitle').textContent = t('editTime');
   $('#announceGroupWrap').classList.add('hidden');
   const d = new Date(a.arrive);
   state.exact = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -573,14 +1019,14 @@ function closeModal() {
 
 async function confirmAnnounce() {
   if (!validTime(state.exact)) {
-    toast('Escolha um horário entre ' + TIME_WINDOWS.map((w) => w.label).join(' ou ') + '.');
+    toast(timeInvalidMsg());
     return;
   }
   const r = arrival();
   const payload = { when: r.when, arrive: r.arrive, label: r.label };
   if (!state.editingId && state.announceGroup) payload.groupId = state.announceGroup;
   const isEdit = !!state.editingId;
-  $('#confirmBtn').textContent = 'Enviando…';
+  $('#confirmBtn').textContent = t('sending');
   $('#confirmBtn').disabled = true;
   try {
     const resp = await fetch(isEdit ? `/api/announce/${state.editingId}` : '/api/announce', {
@@ -592,12 +1038,12 @@ async function confirmAnnounce() {
     if (!resp.ok) throw new Error('invalid');
     state.editingId = '';
     closeModal();
-    toast(isEdit ? 'Horário atualizado!' : 'Aviso enviado!');
+    toast(isEdit ? t('announceUpdated') : t('announceSent'));
     renderTimeline();
   } catch {
-    toast('Falha ao enviar. Tente de novo.');
+    toast(t('announceFailed'));
   }
-  $('#confirmBtn').textContent = 'Confirmar';
+  $('#confirmBtn').textContent = t('confirm');
   $('#confirmBtn').disabled = false;
 }
 
@@ -613,7 +1059,7 @@ function start() {
   $('#exactTime').addEventListener('change', (e) => {
     const t = e.target.value;
     if (!validTime(t)) {
-      toast('Escolha um horário entre ' + TIME_WINDOWS.map((w) => w.label).join(' ou ') + '.');
+      toast(timeInvalidMsg());
       $('#exactTime').value = state.exact;
     } else {
       state.exact = t;
@@ -685,7 +1131,7 @@ function parseMenuText(raw) {
     const m = Number(dm[2]);
     const y = Number(dm[3]);
     date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    dateLabel = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${DAYS[new Date(y, m - 1, d).getDay()]})`;
+    dateLabel = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} (${dayNames()[new Date(y, m - 1, d).getDay()]})`;
   }
   const items = [];
   for (const line of lines) {
@@ -719,7 +1165,7 @@ function tagify(li, item) {
   if (item.veg) {
     const s = document.createElement('span');
     s.className = 'tag veg';
-    s.textContent = 'vegetariano';
+    s.textContent = t('tagVeg');
     li.appendChild(s);
   }
   const type = item.mark != null
@@ -729,14 +1175,14 @@ function tagify(li, item) {
     li.classList.add('ref-line');
     const s = document.createElement('span');
     s.className = 'tag aviso';
-    s.textContent = 'aviso';
+    s.textContent = t('tagWarn');
     li.appendChild(s);
   } else if (type === 'ref2') {
     li.classList.add('ref2-line');
   } else if (item.lactose) {
     const s = document.createElement('span');
     s.className = 'tag lac';
-    s.textContent = 'lactose';
+    s.textContent = t('tagLac');
     li.appendChild(s);
   }
 }
@@ -768,7 +1214,7 @@ function closeMenuModal() {
 function menuNext() {
   const p = parseMenuText($('#menuText').value);
   if (!p.items.length) {
-    toast('Cole o cardápio primeiro.');
+    toast(t('pasteFirst'));
     return;
   }
   state.pendingMenu = p;
@@ -788,8 +1234,8 @@ function renderMenuPreview() {
   prev.innerHTML = '';
   const head = document.createElement('div');
   head.className = 'fv';
-  const meal = p.meal === 'jantar' ? 'Jantar' : 'Almoço';
-  head.textContent = `${meal} · ${p.dateLabel || p.date} · ${p.items.length} itens`;
+  const meal = p.meal === 'jantar' ? t('dinner') : t('lunch');
+  head.textContent = `${meal} · ${p.dateLabel || p.date} · ${t('itemCount', { n: p.items.length })}`;
   prev.appendChild(head);
   const ul = document.createElement('ul');
   ul.className = 'menu-items';
@@ -805,7 +1251,7 @@ function renderMenuPreview() {
 async function saveMenu() {
   const p = state.pendingMenu;
   if (!p || !p.meal) return;
-  $('#menuSave').textContent = 'Publicando…';
+  $('#menuSave').textContent = t('publishing');
   $('#menuSave').disabled = true;
   try {
     const resp = await fetch('/api/menu', {
@@ -821,12 +1267,12 @@ async function saveMenu() {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
     closeMenuModal();
-    toast('Cardápio publicado!');
+    toast(t('menuPublished'));
     renderMenu();
   } catch {
-    toast('Falha ao publicar. Tente de novo.');
+    toast(t('menuPublishFailed'));
   }
-  $('#menuSave').textContent = 'Publicar';
+  $('#menuSave').textContent = t('publish');
   $('#menuSave').disabled = false;
 }
 
@@ -846,15 +1292,15 @@ async function renderMenu() {
     card.className = 'card menu';
     const title = document.createElement('div');
     title.className = 'menu-title';
-    title.textContent = 'Cardápio';
+    title.textContent = t('menuTitle');
     const sub = document.createElement('p');
     sub.className = 'sub';
-    sub.textContent = 'O cardápio de hoje vem do Telegram. Dá pra colar aqui pra todo mundo ver.';
+    sub.textContent = t('menuEmptySub');
     card.append(title, sub);
     if (canEditMenu()) {
       const btn = document.createElement('button');
       btn.className = 'primary with-icon';
-      btn.innerHTML = icon('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 16) + ' Adicionar cardápio';
+      btn.innerHTML = icon('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 16) + ' ' + t('addMenu');
       btn.onclick = () => openMenuModal();
       card.appendChild(btn);
     }
@@ -879,7 +1325,7 @@ async function renderMenu() {
   const titles = document.createElement('div');
   const title = document.createElement('div');
   title.className = 'menu-title';
-  title.textContent = 'Cardápio';
+  title.textContent = t('menuTitle');
   const date = document.createElement('div');
   date.className = 'menu-date';
   const any = almoço || jantar;
@@ -889,7 +1335,7 @@ async function renderMenu() {
     const editBtn = document.createElement('button');
     editBtn.className = 'menu-edit';
     editBtn.innerHTML = ICONS.pencil;
-    editBtn.title = 'Editar cardápio';
+    editBtn.title = t('editMenu');
     editBtn.onclick = () => openMenuModal();
     head.append(titles, editBtn);
   } else {
@@ -906,7 +1352,7 @@ async function renderMenu() {
     b.onclick = () => { state.menuTab = meal; renderMenu(); };
     return b;
   };
-  tabs.append(mkTab('almoço', 'Almoço', !!almoço), mkTab('jantar', 'Jantar', !!jantar));
+  tabs.append(mkTab('almoço', t('lunch'), !!almoço), mkTab('jantar', t('dinner'), !!jantar));
   card.appendChild(tabs);
 
   if (current) {
@@ -922,7 +1368,7 @@ async function renderMenu() {
   } else {
     const p = document.createElement('p');
     p.className = 'sub';
-    p.textContent = 'Ainda não tem cardápio desse horário.';
+    p.textContent = t('noMenuMeal');
     card.appendChild(p);
   }
 
@@ -975,13 +1421,13 @@ async function renderFriends() {
     if (!resp.ok) throw new Error('invalid');
     data = await resp.json();
   } catch {
-    toast('Falha ao carregar amigos.');
+    toast(t('friendsLoadFailed'));
   }
   const wrap = $('#friendSections');
   wrap.innerHTML = '';
-  if (data.incoming.length) wrap.appendChild(friendSection('Pedidos de amizade', data.incoming, 'incoming'));
-  if (data.friends.length) wrap.appendChild(friendSection('Meus amigos', data.friends, 'friend'));
-  if (data.outgoing.length) wrap.appendChild(friendSection('Pedidos enviados', data.outgoing, 'outgoing'));
+  if (data.incoming.length) wrap.appendChild(friendSection(t('friendReq'), data.incoming, 'incoming'));
+  if (data.friends.length) wrap.appendChild(friendSection(t('myFriends'), data.friends, 'friend'));
+  if (data.outgoing.length) wrap.appendChild(friendSection(t('requestsSent'), data.outgoing, 'outgoing'));
 }
 
 function friendSection(title, rows, kind) {
@@ -1031,10 +1477,10 @@ function friendRow(u, kind) {
     b.textContent = txt;
     acts.appendChild(b);
   };
-  if (kind === 'friend') mk('Remover', 'remove');
-  else if (kind === 'incoming') { mk('Aceitar', 'accept', 'primary'); mk('Recusar', 'decline', 'ghost'); }
-  else if (kind === 'outgoing') mk('Cancelar', 'cancel');
-  else mk('Adicionar', 'add', 'primary');
+  if (kind === 'friend') mk(t('removeFriend'), 'remove');
+  else if (kind === 'incoming') { mk(t('accept'), 'accept', 'primary'); mk(t('decline'), 'decline', 'ghost'); }
+  else if (kind === 'outgoing') mk(t('cancelReq'), 'cancel');
+  else mk(t('add'), 'add', 'primary');
 
   row.append(av, info, acts);
   return row;
@@ -1057,7 +1503,7 @@ function onFriendSearch(e) {
       if (!list.length) {
         const p = document.createElement('p');
         p.className = 'sub friends-hint';
-        p.textContent = 'Ninguém com esse nome ou e-mail por aqui.';
+        p.textContent = t('noOneFound');
         box.appendChild(p);
         return;
       }
@@ -1066,7 +1512,7 @@ function onFriendSearch(e) {
         box.appendChild(friendRow(u, kind));
       }
     } catch {
-      toast('Falha na busca.');
+      toast(t('searchFailed'));
     }
   }, 300);
 }
@@ -1085,21 +1531,21 @@ async function friendAction(action, email) {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      toast(j.error || 'Falha na ação.');
+      toast(j.error || t('actionFailed'));
       return;
     }
     const msg =
-      action === 'add' ? 'Pedido de amizade enviado!' :
-      action === 'accept' ? 'Agora vocês são amigos!' :
-      action === 'decline' ? 'Pedido recusado.' :
-      action === 'cancel' ? 'Pedido cancelado.' : 'Amigo removido.';
+      action === 'add' ? t('requestSent') :
+      action === 'accept' ? t('nowFriends') :
+      action === 'decline' ? t('requestDeclined') :
+      action === 'cancel' ? t('requestCancelled') : t('friendRemoved');
     toast(msg);
     renderFriends();
     const q = $('#friendSearch').value.trim();
     if (q) onFriendSearch({ target: { value: q } });
     if (state.scope === 'friends') renderTimeline();
   } catch {
-    toast('Falha. Tente de novo.');
+    toast(t('actionFailed'));
   }
 }
 
@@ -1130,7 +1576,7 @@ function renderGroupBar() {
     const b = document.createElement('button');
     b.className = 'tab' + (state.groupId === g.id ? ' active' : '');
     b.textContent = g.name;
-    if (g.owner === state.email) b.title = 'Código: ' + g.code;
+    if (g.owner === state.email) b.title = t('codeLabel', { code: g.code });
     b.addEventListener('click', () => {
       state.groupId = g.id;
       syncScopeTabs();
@@ -1140,8 +1586,8 @@ function renderGroupBar() {
   }
   const add = document.createElement('button');
   add.className = 'tab add-chip';
-  add.textContent = '＋ Novo / Código';
-  add.title = 'Criar grupo ou entrar com código';
+  add.textContent = t('newOrCode');
+  add.title = t('groupBarAddTitle');
   add.addEventListener('click', openGroups);
   bar.appendChild(add);
 }
@@ -1165,7 +1611,7 @@ async function renderGroupsList() {
     $('#groupsHeading').classList.add('hidden');
     const p = document.createElement('p');
     p.className = 'sub friends-hint';
-    p.textContent = 'Você ainda não está em nenhum grupo. Crie um acima ou entre com um código.';
+    p.textContent = t('noGroups');
     wrap.appendChild(p);
     return;
   }
@@ -1187,8 +1633,8 @@ function groupRow(g) {
   em.className = 'when';
   const bits = [];
   if (g.description) bits.push(g.description);
-  bits.push(`${g.memberCount} ${g.memberCount === 1 ? 'membro' : 'membros'}`);
-  if (isOwner && g.code) bits.push(`Código: ${g.code}`);
+  bits.push(g.memberCount === 1 ? t('memberOne', { n: g.memberCount }) : t('memberMany', { n: g.memberCount }));
+  if (isOwner && g.code) bits.push(t('codeLabel', { code: g.code }));
   em.textContent = bits.join(' · ');
   info.append(nm, em);
   row.appendChild(info);
@@ -1198,11 +1644,11 @@ function groupRow(g) {
   const btn = document.createElement('button');
   btn.className = 'mini-act ghost';
   if (isOwner) {
-    btn.textContent = 'Excluir';
-    btn.title = 'Exclui o grupo e todos os avisos dele';
+    btn.textContent = t('deleteGroup');
+    btn.title = t('deleteHint');
     btn.addEventListener('click', () => deleteGroup(g.id));
   } else {
-    btn.textContent = 'Sair';
+    btn.textContent = t('leave');
     btn.addEventListener('click', () => leaveGroup(g.id));
   }
   acts.appendChild(btn);
@@ -1217,7 +1663,7 @@ function groupMembers(g) {
   box.className = 'group-members';
   const h = document.createElement('div');
   h.className = 'gm-title';
-  h.textContent = 'Membros';
+  h.textContent = t('membersLabel');
   box.appendChild(h);
   for (const m of g.members) {
     const chip = document.createElement('div');
@@ -1239,7 +1685,7 @@ function groupMembers(g) {
     mi.className = 'f-info';
     const mn = document.createElement('div');
     mn.className = 'name';
-    mn.textContent = m.isOwner ? `${m.name || m.email} (criador)` : (m.name || m.email);
+    mn.textContent = m.isOwner ? `${m.name || m.email} ${t('creatorLabel')}` : (m.name || m.email);
     const me = document.createElement('div');
     me.className = 'when';
     me.textContent = m.course || m.email;
@@ -1250,7 +1696,7 @@ function groupMembers(g) {
     if (!m.isOwner) {
       const kick = document.createElement('button');
       kick.className = 'mini-act ghost';
-      kick.textContent = 'Remover';
+      kick.textContent = t('remove');
       kick.addEventListener('click', () => kickMember(g.id, m.email));
       chip.appendChild(kick);
     }
@@ -1269,21 +1715,21 @@ async function kickMember(id, email) {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      return toast(j.error || 'Falha ao remover o membro.');
+      return toast(j.error || t('memberRemovedFailed'));
     }
-    toast('Membro removido do grupo.');
+    toast(t('memberRemoved'));
     renderGroupsList();
   } catch {
-    toast('Falha ao remover o membro.');
+    toast(t('memberRemovedFailed'));
   }
 }
 
 async function createGroup() {
   const name = $('#groupName').value.trim();
-  if (!name) return toast('Dê um nome ao grupo.');
+  if (!name) return toast(t('groupNameRequired'));
   const btn = $('#groupCreate');
   btn.disabled = true;
-  btn.textContent = 'Criando…';
+  btn.textContent = t('creating');
   try {
     const resp = await fetch('/api/groups', {
       method: 'POST',
@@ -1293,12 +1739,12 @@ async function createGroup() {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      return toast(j.error || 'Falha ao criar grupo.');
+      return toast(j.error || t('groupCreateFailed'));
     }
     const g = await resp.json();
     $('#groupName').value = '';
     $('#groupDesc').value = '';
-    toast(`Grupo criado! Código: ${g.code}`);
+    toast(t('groupCreated', { code: g.code }));
     await fetchMyGroups();
     state.scope = 'group';
     state.groupId = g.id;
@@ -1307,18 +1753,18 @@ async function createGroup() {
     renderGroupsList();
     renderTimeline();
   } catch {
-    toast('Falha ao criar grupo.');
+    toast(t('groupCreateFailed'));
   }
   btn.disabled = false;
-  btn.textContent = 'Criar grupo';
+  btn.textContent = t('createGroup');
 }
 
 async function joinGroup() {
   const code = $('#groupCodeInput').value.trim().toUpperCase();
-  if (!code) return toast('Digite o código.');
+  if (!code) return toast(t('codeRequired'));
   const btn = $('#groupJoin');
   btn.disabled = true;
-  btn.textContent = 'Entrando…';
+  btn.textContent = t('joining');
   try {
     const resp = await fetch('/api/groups/join', {
       method: 'POST',
@@ -1328,11 +1774,11 @@ async function joinGroup() {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      return toast(j.error || 'Código inválido.');
+      return toast(j.error || t('invalidCode'));
     }
     const g = await resp.json();
     $('#groupCodeInput').value = '';
-    toast(`Você entrou em ${g.name}!`);
+    toast(t('enteredGroup', { name: g.name }));
     await fetchMyGroups();
     state.groupId = g.id;
     state.scope = 'group';
@@ -1341,10 +1787,10 @@ async function joinGroup() {
     renderGroupsList();
     renderTimeline();
   } catch {
-    toast('Falha ao entrar no grupo.');
+    toast(t('joinFailed'));
   }
   btn.disabled = false;
-  btn.textContent = 'Entrar no grupo';
+  btn.textContent = t('joinGroupBtn');
 }
 
 async function leaveGroup(id) {
@@ -1353,34 +1799,34 @@ async function leaveGroup(id) {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      return toast(j.error || 'Falha ao sair do grupo.');
+      return toast(j.error || t('leaveFailed'));
     }
-    toast('Você saiu do grupo.');
+    toast(t('leftGroup'));
     await fetchMyGroups();
     if (state.groupId === id) state.groupId = state.groups[0] ? state.groups[0].id : '';
     renderGroupsList();
     if (state.scope === 'group') renderTimeline();
   } catch {
-    toast('Falha ao sair do grupo.');
+    toast(t('leaveFailed'));
   }
 }
 
 async function deleteGroup(id) {
-  if (!confirm('Excluir o grupo e todos os avisos dele?')) return;
+  if (!confirm(t('deleteGroupConfirm'))) return;
   try {
     const resp = await fetch(`/api/groups/${id}`, { method: 'DELETE', headers: authHeaders() });
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      return toast(j.error || 'Falha ao excluir o grupo.');
+      return toast(j.error || t('deleteFailed'));
     }
-    toast('Grupo excluído.');
+    toast(t('groupDeleted'));
     await fetchMyGroups();
     if (state.groupId === id) state.groupId = state.groups[0] ? state.groups[0].id : '';
     renderGroupsList();
     if (state.scope === 'group') renderTimeline();
   } catch {
-    toast('Falha ao excluir o grupo.');
+    toast(t('deleteFailed'));
   }
 }
 
@@ -1390,13 +1836,13 @@ async function joinEvent(id) {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      toast(j.error || 'Falha ao entrar.');
+      toast(j.error || t('enterFailed'));
       return;
     }
-    toast('Você vai junto!');
+    toast(t('joinToast'));
     renderTimeline();
   } catch {
-    toast('Falha. Tente de novo.');
+    toast(t('actionFailed'));
   }
 }
 
@@ -1406,19 +1852,69 @@ async function unjoinEvent(id) {
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({}));
-      toast(j.error || 'Falha ao sair.');
+      toast(j.error || t('unjoinFailed'));
       return;
     }
-    toast('Você saiu do aviso.');
+    toast(t('leftAnnounce'));
     renderTimeline();
   } catch {
-    toast('Falha. Tente de novo.');
+    toast(t('actionFailed'));
   }
 }
 
 function handleAuthExpired() {
-  toast('Sessão expirada. Entre de novo.');
+  toast(t('sessionExpired'));
   setTimeout(logout, 1200);
+}
+
+async function arrivedEvent(id, btn) {
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/api/announce/${id}/arrived`, { method: 'POST', headers: authHeaders() });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      toast(j.error || t('arrivedFailed'));
+      return;
+    }
+    toast(t('arrivedSent'));
+    renderTimeline();
+  } catch {
+    toast(t('arrivedFailed'));
+  }
+  btn.disabled = false;
+}
+
+function openProfileView(name, photo, email) {
+  const box = $('#profileViewAvatar');
+  box.innerHTML = '';
+  if (photo) {
+    const img = document.createElement('img');
+    img.src = photo;
+    img.alt = name;
+    box.appendChild(img);
+  } else {
+    box.textContent = (name || '?').trim().charAt(0).toUpperCase();
+  }
+  $('#profileViewName').textContent = name;
+  $('#profileViewEmail').textContent = email || '';
+  $('#profileOverlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeProfileView() {
+  $('#profileOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function openCredits() {
+  $('#creditsOverlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCredits() {
+  $('#creditsOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
 }
 
 async function initGoogle() {
@@ -1429,7 +1925,7 @@ async function initGoogle() {
     return;
   }
   if (!cfg.googleClientId) {
-    $('#authError').textContent = 'Login do Google ainda não configurado no servidor.';
+    $('#authError').textContent = t('googleNotConfigured');
     $('#authError').classList.remove('hidden');
     return;
   }
@@ -1459,7 +1955,7 @@ async function handleCredential(response) {
       body: JSON.stringify({ credential: response.credential }),
     });
     if (resp.status === 401) {
-      $('#authError').textContent = 'Essa conta não é da UFOP. Use seu e-mail @aluno.ufop.edu.br.';
+      $('#authError').textContent = t('notUfop');
       $('#authError').classList.remove('hidden');
       return;
     }
@@ -1475,7 +1971,7 @@ async function handleCredential(response) {
       start();
     }
   } catch {
-    $('#authError').textContent = 'Falha ao entrar. Tente de novo.';
+    $('#authError').textContent = t('loginFailed');
     $('#authError').classList.remove('hidden');
   }
 }
@@ -1496,7 +1992,7 @@ async function bootstrap() {
 
 function fillCourseDatalist() {
   const el = $('#courseInput');
-  el.innerHTML = `<option value="">Escolha seu curso…</option>${COURSE_OPTIONS}`;
+  el.innerHTML = `<option value="">${t('coursePlaceholder')}</option>${COURSE_OPTIONS}`;
 }
 
 function openCourseSheet(required) {
@@ -1513,8 +2009,8 @@ function openCourseSheet(required) {
   }
   $('#courseName').textContent = state.name;
   $('#courseMsg').textContent = required
-    ? 'Conta pra gente seu curso pra confirmar.'
-    : 'Seu perfil: mude a foto ou o curso quando quiser.';
+    ? t('courseRequiredMsg')
+    : t('courseEditMsg');
   $('#courseInput').value = COURSES.includes(state.course) ? state.course : '';
   $('#courseError').classList.add('hidden');
   ov.classList.remove('hidden');
@@ -1529,13 +2025,13 @@ function closeCourseSheet() {
 async function saveCourse() {
   const course = $('#courseInput').value.trim();
   if (!course) {
-    $('#courseError').textContent = 'Informe seu curso para continuar.';
+    $('#courseError').textContent = t('courseError');
     $('#courseError').classList.remove('hidden');
     return;
   }
   $('#courseError').classList.add('hidden');
   $('#courseSave').disabled = true;
-  $('#courseSave').textContent = 'Salvando…';
+  $('#courseSave').textContent = t('saving');
   try {
     const resp = await fetch('/api/me', {
       method: 'POST',
@@ -1547,17 +2043,26 @@ async function saveCourse() {
     const p = await resp.json();
     applyProfile(p);
     closeCourseSheet();
-    toast('Perfil atualizado!');
+    toast(t('courseSaved'));
   } catch {
-    toast('Falha ao salvar. Tente de novo.');
+    toast(t('courseSaveFailed'));
   }
-  $('#courseSave').textContent = 'Salvar';
+  $('#courseSave').textContent = t('save');
   $('#courseSave').disabled = false;
 }
 
 $('#courseCancel').addEventListener('click', closeCourseSheet);
 $('#courseSave').addEventListener('click', saveCourse);
 $('#profileBtn').addEventListener('click', () => openCourseSheet(false));
+$('#creditsBtn').addEventListener('click', openCredits);
+$('#creditsClose').addEventListener('click', closeCredits);
+$('#profileViewClose').addEventListener('click', closeProfileView);
+$('#profileOverlay').addEventListener('click', (e) => {
+  if (e.target === $('#profileOverlay')) closeProfileView();
+});
+$('#creditsOverlay').addEventListener('click', (e) => {
+  if (e.target === $('#creditsOverlay')) closeCredits();
+});
 $('#coursePhotoBtn').addEventListener('click', () => $('#coursePhotoFile').click());
 $('#coursePhotoFile').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];
@@ -1583,8 +2088,12 @@ $('#coursePhotoFile').addEventListener('change', (e) => {
   e.target.value = '';
 });
 
+applyStaticLang();
 fillCourseDatalist();
 bootstrap();
+
+const langSel = document.getElementById('langSelect');
+if (langSel) langSel.addEventListener('change', (e) => setLang(e.target.value));
 
 const logoImg = document.getElementById('logoImg');
 if (logoImg) logoImg.addEventListener('load', () => logoImg.classList.add('loaded'));
