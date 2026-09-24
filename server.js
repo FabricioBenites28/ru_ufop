@@ -279,16 +279,34 @@ function groupMemberEmails(gid) {
   return g && Array.isArray(g.members) ? g.members : [];
 }
 
-function publicGroup(g) {
+function publicGroup(g, viewerEmail) {
+  const canSeeCode = viewerEmail && g.owner === viewerEmail;
   return {
     id: g.id,
     name: g.name,
     description: g.description || '',
     owner: g.owner,
-    code: g.code,
+    code: canSeeCode ? g.code : '',
     memberCount: g.members.length,
     createdAt: g.createdAt,
   };
+}
+
+function groupView(g, viewerEmail) {
+  const view = publicGroup(g, viewerEmail);
+  if (g.owner === viewerEmail) {
+    view.members = g.members.map((email) => {
+      const u = db.users[email] || {};
+      return {
+        email,
+        name: u.name || nameFromEmail(email),
+        photo: u.photo || '',
+        course: u.course || '',
+        isOwner: email === g.owner,
+      };
+    });
+  }
+  return view;
 }
 
 function groupCode() {
@@ -867,7 +885,9 @@ app.delete('/api/friends/:email', requireAuth, async (req, res) => {
 });
 
 app.get('/api/groups', requireAuth, (req, res) => {
-  const mine = (db.groups || []).filter((g) => g.members.includes(req.user.email)).map(publicGroup);
+  const mine = (db.groups || [])
+    .filter((g) => g.members.includes(req.user.email))
+    .map((g) => groupView(g, req.user.email));
   res.json(mine);
 });
 
@@ -887,18 +907,37 @@ app.post('/api/groups', requireAuth, async (req, res) => {
   db.groups = db.groups || [];
   db.groups.push(group);
   await save();
-  res.json(publicGroup(group));
+  res.json(publicGroup(group, req.user.email));
 });
 
 app.post('/api/groups/join', requireAuth, async (req, res) => {
   const code = String(req.body.code || '').trim().toUpperCase();
   const g = (db.groups || []).find((x) => x.code === code);
   if (!g) return res.status(404).json({ error: 'código inválido' });
-  if (g.members.includes(req.user.email)) return res.json(publicGroup(g));
+  if (g.members.includes(req.user.email)) return res.json(publicGroup(g, req.user.email));
   g.members.push(req.user.email);
   await save();
   sendPushToEmails([g.owner], req.user.name || nameFromEmail(req.user.email), `entrou no grupo ${g.name}`);
-  res.json(publicGroup(g));
+  res.json(publicGroup(g, req.user.email));
+});
+
+app.post('/api/groups/:id/kick', requireAuth, async (req, res) => {
+  const g = groupById(req.params.id);
+  if (!g) return res.status(404).json({ error: 'grupo não encontrado' });
+  if (g.owner !== req.user.email) {
+    return res.status(403).json({ error: 'só o criador do grupo pode remover membros' });
+  }
+  const email = String(req.body.email || '').trim().toLowerCase();
+  if (!g.members.includes(email)) {
+    return res.status(404).json({ error: 'membro não encontrado' });
+  }
+  if (email === g.owner) {
+    return res.status(400).json({ error: 'o criador não pode ser removido' });
+  }
+  g.members = g.members.filter((e) => e !== email);
+  db.announcements = db.announcements.filter((a) => !(a.groupId === g.id && a.email === email));
+  await save();
+  res.json(groupView(g, req.user.email));
 });
 
 app.post('/api/groups/:id/leave', requireAuth, async (req, res) => {
@@ -908,6 +947,7 @@ app.post('/api/groups/:id/leave', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'você não é membro desse grupo' });
   }
   g.members = g.members.filter((e) => e !== req.user.email);
+  db.announcements = db.announcements.filter((a) => !(a.groupId === g.id && a.email === req.user.email));
   await save();
   if (!g.members.length) {
     db.groups = db.groups.filter((x) => x.id !== g.id);

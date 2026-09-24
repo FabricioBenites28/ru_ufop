@@ -88,7 +88,7 @@ function applyProfile(p) {
   $('#logoutBtn').classList.remove('hidden');
   $('#announceBtn').classList.remove('hidden');
   $('#friendsBtn').classList.remove('hidden');
-  $('#scopeBar').classList.remove('hidden');
+  $('#bottomNav').classList.remove('hidden');
   syncScopeTabs();
   $('#brandSub').textContent = `oi, ${state.name.split(' ')[0]} 👋`;
 }
@@ -119,7 +119,7 @@ function openLogin() {
   $('#profileBtn').classList.add('hidden');
   $('#announceBtn').classList.add('hidden');
   $('#friendsBtn').classList.add('hidden');
-  $('#scopeBar').classList.add('hidden');
+  $('#bottomNav').classList.add('hidden');
   $('#groupBar').classList.add('hidden');
   $('#emailOverlay').classList.remove('hidden');
   $('#gButton').innerHTML = '';
@@ -639,7 +639,6 @@ function start() {
   $('#friendsClose').addEventListener('click', closeFriends);
   $('#scopeAllBtn').addEventListener('click', () => setScope('all'));
   $('#scopeFriendsBtn').addEventListener('click', () => setScope('friends'));
-  $('#scopeMeBtn').addEventListener('click', () => setScope('me'));
   $('#scopeGroupsBtn').addEventListener('click', () => setScope('group'));
   $('#groupCreate').addEventListener('click', createGroup);
   $('#groupJoin').addEventListener('click', joinGroup);
@@ -931,9 +930,12 @@ async function renderMenu() {
 }
 
 function syncScopeTabs() {
+  if (state.scope === 'me') {
+    state.scope = 'all';
+    localStorage.setItem('ru_scope', 'all');
+  }
   $('#scopeAllBtn').classList.toggle('active', state.scope === 'all');
   $('#scopeFriendsBtn').classList.toggle('active', state.scope === 'friends');
-  $('#scopeMeBtn').classList.toggle('active', state.scope === 'me');
   $('#scopeGroupsBtn').classList.toggle('active', state.scope === 'group');
   renderGroupBar();
 }
@@ -1128,7 +1130,7 @@ function renderGroupBar() {
     const b = document.createElement('button');
     b.className = 'tab' + (state.groupId === g.id ? ' active' : '');
     b.textContent = g.name;
-    b.title = 'Código: ' + g.code;
+    if (g.owner === state.email) b.title = 'Código: ' + g.code;
     b.addEventListener('click', () => {
       state.groupId = g.id;
       syncScopeTabs();
@@ -1160,43 +1162,119 @@ async function renderGroupsList() {
   const wrap = $('#groupsList');
   wrap.innerHTML = '';
   if (!state.groups.length) {
+    $('#groupsHeading').classList.add('hidden');
     const p = document.createElement('p');
     p.className = 'sub friends-hint';
     p.textContent = 'Você ainda não está em nenhum grupo. Crie um acima ou entre com um código.';
     wrap.appendChild(p);
     return;
   }
-  for (const g of state.groups) {
-    const row = document.createElement('div');
-    row.className = 'friend-row';
+  $('#groupsHeading').classList.remove('hidden');
+  for (const g of state.groups) wrap.appendChild(groupRow(g));
+}
 
-    const info = document.createElement('div');
-    info.className = 'f-info';
-    const nm = document.createElement('div');
-    nm.className = 'name';
-    nm.textContent = g.name;
-    const em = document.createElement('div');
-    em.className = 'when';
-    em.textContent = `${g.description ? g.description + ' · ' : ''}${g.memberCount} membro(s) · Código: ${g.code}`;
-    info.append(nm, em);
+function groupRow(g) {
+  const isOwner = g.owner === state.email;
+  const row = document.createElement('div');
+  row.className = 'group-row';
 
-    const acts = document.createElement('div');
-    acts.className = 'mini-acts';
-    const btn = document.createElement('button');
-    if (g.owner === state.email) {
-      btn.className = 'mini-act ghost';
-      btn.textContent = 'Excluir';
-      btn.title = 'Exclui o grupo e todos os avisos dele';
-      btn.addEventListener('click', () => deleteGroup(g.id));
+  const info = document.createElement('div');
+  info.className = 'f-info';
+  const nm = document.createElement('div');
+  nm.className = 'name';
+  nm.textContent = g.name;
+  const em = document.createElement('div');
+  em.className = 'when';
+  const bits = [];
+  if (g.description) bits.push(g.description);
+  bits.push(`${g.memberCount} ${g.memberCount === 1 ? 'membro' : 'membros'}`);
+  if (isOwner && g.code) bits.push(`Código: ${g.code}`);
+  em.textContent = bits.join(' · ');
+  info.append(nm, em);
+  row.appendChild(info);
+
+  const acts = document.createElement('div');
+  acts.className = 'mini-acts';
+  const btn = document.createElement('button');
+  btn.className = 'mini-act ghost';
+  if (isOwner) {
+    btn.textContent = 'Excluir';
+    btn.title = 'Exclui o grupo e todos os avisos dele';
+    btn.addEventListener('click', () => deleteGroup(g.id));
+  } else {
+    btn.textContent = 'Sair';
+    btn.addEventListener('click', () => leaveGroup(g.id));
+  }
+  acts.appendChild(btn);
+  row.appendChild(acts);
+
+  if (isOwner && Array.isArray(g.members)) row.appendChild(groupMembers(g));
+  return row;
+}
+
+function groupMembers(g) {
+  const box = document.createElement('div');
+  box.className = 'group-members';
+  const h = document.createElement('div');
+  h.className = 'gm-title';
+  h.textContent = 'Membros';
+  box.appendChild(h);
+  for (const m of g.members) {
+    const chip = document.createElement('div');
+    chip.className = 'friend-row';
+
+    const av = document.createElement('span');
+    av.className = 'avatar mini';
+    if (m.photo) {
+      const img = document.createElement('img');
+      img.src = m.photo;
+      img.alt = m.name;
+      img.referrerPolicy = 'no-referrer';
+      av.appendChild(img);
     } else {
-      btn.className = 'mini-act ghost';
-      btn.textContent = 'Sair';
-      btn.addEventListener('click', () => leaveGroup(g.id));
+      av.textContent = (m.name || m.email || '?').trim().charAt(0).toUpperCase();
     }
-    acts.appendChild(btn);
 
-    row.append(info, acts);
-    wrap.appendChild(row);
+    const mi = document.createElement('div');
+    mi.className = 'f-info';
+    const mn = document.createElement('div');
+    mn.className = 'name';
+    mn.textContent = m.isOwner ? `${m.name || m.email} (criador)` : (m.name || m.email);
+    const me = document.createElement('div');
+    me.className = 'when';
+    me.textContent = m.course || m.email;
+    mi.append(mn, me);
+
+    chip.append(av, mi);
+
+    if (!m.isOwner) {
+      const kick = document.createElement('button');
+      kick.className = 'mini-act ghost';
+      kick.textContent = 'Remover';
+      kick.addEventListener('click', () => kickMember(g.id, m.email));
+      chip.appendChild(kick);
+    }
+    box.appendChild(chip);
+  }
+  return box;
+}
+
+async function kickMember(id, email) {
+  try {
+    const resp = await fetch(`/api/groups/${id}/kick`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ email }),
+    });
+    if (resp.status === 401) return handleAuthExpired();
+    if (!resp.ok) {
+      const j = await resp.json().catch(() => ({}));
+      return toast(j.error || 'Falha ao remover o membro.');
+    }
+    toast('Membro removido do grupo.');
+    renderGroupsList();
+  } catch {
+    toast('Falha ao remover o membro.');
   }
 }
 

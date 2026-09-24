@@ -36,12 +36,6 @@
 
   <main>
     <section id="menuSection"></section>
-    <div id="scopeBar" class="tabs scope-bar hidden">
-      <button id="scopeAllBtn" class="tab active">Todos</button>
-      <button id="scopeFriendsBtn" class="tab">Amigos</button>
-      <button id="scopeMeBtn" class="tab">Meus avisos</button>
-      <button id="scopeGroupsBtn" class="tab">Grupos</button>
-    </div>
     <div id="groupBar" class="group-bar hidden"></div>
     <section id="timeline"></section>
     <div id="empty" class="empty hidden">
@@ -50,6 +44,21 @@
       <p class="sub">Quando for, toque em + Anunciar para avisar o pessoal.</p>
     </div>
   </main>
+
+  <nav id="bottomNav" class="bottom-nav hidden" aria-label="Navegação">
+    <button id="scopeAllBtn" class="nav-item active">
+      <svg class="icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Todos</span>
+    </button>
+    <button id="scopeFriendsBtn" class="nav-item">
+      <svg class="icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Amigos</span>
+    </button>
+    <button id="scopeGroupsBtn" class="nav-item">
+      <svg class="icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      <span>Grupos</span>
+    </button>
+  </nav>
 
   <button id="announceBtn" class="fab hidden"><svg class="icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Anunciar</button>
 
@@ -141,9 +150,9 @@
     <div class="sheet">
       <div class="sheet-grab"></div>
       <h2><svg class="icon icon-18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Grupos</h2>
-      <p class="sub friends-sub">Crie um grupo e compartilhe o código para os colegas entrarem. Todo membro pode anunciar.</p>
+      <p class="sub friends-sub">Crie um grupo e compartilhe o código com os colegas para eles entrarem. Só o criador vê o código e pode remover membros. Todo membro pode anunciar.</p>
       <div class="friend-sections">
-        <div class="day-group">Seus grupos</div>
+        <div id="groupsHeading" class="day-group">Seus grupos</div>
         <div id="groupsList" class="friend-rows"></div>
       </div>
       <div class="day-group">Criar grupo</div>
