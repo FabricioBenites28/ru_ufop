@@ -2106,4 +2106,7 @@ const langSel = document.getElementById('langSelect');
 if (langSel) langSel.addEventListener('change', (e) => setLang(e.target.value));
 
 const logoImg = document.getElementById('logoImg');
-if (logoImg) logoImg.addEventListener('load', () => logoImg.classList.add('loaded'));
+if (logoImg) {
+  if (logoImg.complete) logoImg.classList.add('loaded');
+  else logoImg.addEventListener('load', () => logoImg.classList.add('loaded'));
+}
