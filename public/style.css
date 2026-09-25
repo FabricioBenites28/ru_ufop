@@ -1,7 +1,7 @@
 /* ============================================================
    RU UFOP — Design System
    Paleta: branco + azul-celeste (primário) + âmbar/perigo
-   Tipografia: Sora (títulos) + Inter (texto)
+   Tipografia: Jost (toda em MAIÚSCULAS, mesmo tamanho)
    Espaçamento: escala base 4/8px · Raios e sombras consistentes
    ============================================================ */
 
@@ -101,7 +101,7 @@ body::before {
 }
 
 body {
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  font-family: 'Jost', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   color: var(--text);
@@ -110,11 +110,12 @@ body {
   padding-bottom: 168px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-transform: uppercase;
 }
 
 h1, h2, h3, .brand-name, .menu-title, .auth h1, .sheet h2 {
-  font-family: 'Sora', 'Inter', system-ui, sans-serif;
-  letter-spacing: -0.01em;
+  font-family: 'Jost', system-ui, sans-serif;
+  letter-spacing: .01em;
 }
 
 /* ===================== header ===================== */
