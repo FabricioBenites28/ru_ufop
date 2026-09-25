@@ -25,6 +25,8 @@ const MENU_EDITOR_EMAIL = (process.env.MENU_EDITOR_EMAIL || 'carlos.rodriguez@al
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 const MAX_AGE = 24 * 60 * 60 * 1000;
 const REDIS_KEY = 'ru:data';
+const REDIS_SECRET_KEY = 'ru:session-secret';
+const REDIS_VAPID_KEY = 'ru:vapid';
 const APP_TZ = process.env.APP_TZ || 'America/Sao_Paulo';
 
 const app = express();
@@ -191,8 +193,50 @@ function loadVapid() {
   }
 }
 
-const vapid = loadVapid();
-webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
+// Busca as chaves VAPID em: ambiente -> Redis -> arquivo -> gera e persiste.
+// O Redis vem antes do arquivo porque o disco de hosting efemero (Render free,
+// Heroku, Cloud Run) e recriado a cada deploy, e chaves novas invalidam todas as
+// subscriptions de push ja existentes nos navegadores.
+//
+// O valor tambem e um JSON (comeca com {), que o cliente nao tenta decodificar
+// como base64. Pelo mesmo motivo do SESSION_SECRET.
+async function resolveVapid() {
+  if (process.env.VAPID_PUBLIC_KEY || process.env.VAPID_PRIVATE_KEY) {
+    return loadVapid();
+  }
+  if (redis) {
+    try {
+      const saved = await redis.get(REDIS_VAPID_KEY);
+      if (saved) {
+        const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
+        if (isValidVapidKeys(parsed.publicKey, parsed.privateKey)) {
+          return {
+            subject: VAPID_SUBJECT,
+            publicKey: parsed.publicKey,
+            privateKey: parsed.privateKey,
+            envKeys: false,
+          };
+        }
+        console.error('chaves VAPID no Redis invalidas; gerando novas.');
+      }
+      const keys = webpush.generateVAPIDKeys();
+      const config = {
+        subject: VAPID_SUBJECT,
+        publicKey: keys.publicKey,
+        privateKey: keys.privateKey,
+        envKeys: false,
+      };
+      await redis.set(REDIS_VAPID_KEY, JSON.stringify(config));
+      console.log('VAPID: gerei e salvei as chaves no Redis.');
+      return config;
+    } catch (err) {
+      console.error('erro ao ler VAPID do Redis:', err.message);
+    }
+  }
+  return loadVapid();
+}
+
+let vapid = null;
 
 const APP_HOST = process.env.APP_HOST || 'ru-ufop.onrender.com';
 let externalHost = APP_HOST;
@@ -406,7 +450,38 @@ function loadSessionSecret() {
   }
 }
 
-const sessionSecret = loadSessionSecret();
+// Idem: ambiente -> Redis -> arquivo -> gera e persiste. O secret que assina o
+// cookie de sessao precisa sobreviver ao deploy, senao todo mundo e deslogado.
+//
+// O valor vai guardado como {"v":...} e nao como hex cru: o cliente do
+// @upstash/redis decodifica base64 toda string que volta do Redis (o decode() so
+// se salva quando o valor nao parece base64). Um hex de 64 chars e base64
+// valido e voltaria corrompido. O wrapper com { garante que o round-trip
+// funcione independente de como o gateway trate strings.
+async function resolveSessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  if (redis) {
+    try {
+      const stored = await redis.get(REDIS_SECRET_KEY);
+      if (stored) {
+        const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
+        if (parsed && typeof parsed.v === 'string' && parsed.v.trim()) {
+          return parsed.v.trim();
+        }
+        console.error('SESSION_SECRET no Redis invalido; gerando novo.');
+      }
+      const secret = crypto.randomBytes(32).toString('hex');
+      await redis.set(REDIS_SECRET_KEY, JSON.stringify({ v: secret }));
+      console.log('SESSION_SECRET: gerei e salvei no Redis.');
+      return secret;
+    } catch (err) {
+      console.error('erro ao ler SESSION_SECRET do Redis:', err.message);
+    }
+  }
+  return loadSessionSecret();
+}
+
+let sessionSecret = null;
 
 function b64url(obj) {
   return Buffer.from(JSON.stringify(obj)).toString('base64url');
@@ -1093,21 +1168,30 @@ app.delete('/api/groups/:id', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-loadData().then(() => {
-  scheduleReminders();
-  app.listen(PORT, () => {
-    console.log(`RU UFOP rodando na porta ${PORT}`);
-    if (redis) {
-      console.log('persistência: Upstash Redis');
-    } else {
-      console.log(`persistência: arquivo local em ${DATA_FILE}`);
-      if (process.env.RENDER && !process.env.DATA_DIR) {
-        console.error('\nAVISO: você está no Render sem persistência permanente!');
-        console.error('data.json (perfis, amigos, cardápios e avisos) some a cada restart/deploy.');
-        console.error('Resolva com uma das opções:');
-        console.error('  1) Disco persistente do Render + variável de ambiente DATA_DIR=/data');
-        console.error('  2) Upstash Redis (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN)\n');
+loadData()
+  .then(() => Promise.all([resolveSessionSecret(), resolveVapid()]))
+  .then(([secret, vapidConfig]) => {
+    sessionSecret = secret;
+    vapid = vapidConfig;
+    webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
+    scheduleReminders();
+    app.listen(PORT, () => {
+      console.log(`RU UFOP rodando na porta ${PORT}`);
+      if (redis) {
+        console.log('persistência: Upstash Redis');
+      } else {
+        console.log(`persistência: arquivo local em ${DATA_FILE}`);
+        if (process.env.RENDER && !process.env.DATA_DIR) {
+          console.error('\nAVISO: você está no Render sem persistência permanente!');
+          console.error('data.json (perfis, amigos, cardápios e avisos) some a cada restart/deploy.');
+          console.error('Resolva com uma das opções:');
+          console.error('  1) Disco persistente do Render + variável de ambiente DATA_DIR=/data');
+          console.error('  2) Upstash Redis (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN)\n');
+        }
       }
-    }
+    });
+  })
+  .catch((err) => {
+    console.error('falha ao iniciar:', err);
+    process.exit(1);
   });
-});
