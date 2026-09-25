@@ -9,8 +9,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'RU', {
       body: data.body || '',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      icon: '/icons/icon-192.png?v=2',
+      badge: '/icons/icon-192.png?v=2',
       vibrate: [100, 50, 100]
     })
   );
