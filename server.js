@@ -44,7 +44,7 @@ function buildIndex() {
   let html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
   html = html.replace('/app.js?v=res', `/app.js?v=${assetVersion('app.js')}`);
   html = html.replace('/style.css?v=7', `/style.css?v=${assetVersion('style.css')}`);
-  html = html.replace('/logo.png?v=3', `/logo.png?v=${assetVersion('logo.png')}`);
+  html = html.replace('/logo_app.png?v=4', `/logo_app.png?v=${assetVersion('logo_app.png')}`);
   INDEX_HTML = html;
 }
 buildIndex();
