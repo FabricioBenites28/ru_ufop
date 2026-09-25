@@ -4,3 +4,5 @@ data.json
 .session-secret
 *.log
 .env
+.env.*
+*.bak
