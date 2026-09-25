@@ -37,6 +37,7 @@ const I18N = {
     navAll: 'Todos',
     navFriends: 'Amigos',
     navGroups: 'Grupos',
+    navMenu: 'Cardápio',
     announce: 'Anunciar',
     announceTitle: 'Vou comer no RU…',
     editTime: 'Editar horário',
@@ -220,6 +221,7 @@ const I18N = {
     navAll: 'Everyone',
     navFriends: 'Friends',
     navGroups: 'Groups',
+    navMenu: 'Menu',
     announce: 'Announce',
     announceTitle: 'Going to eat at the RU…',
     editTime: 'Edit time',
@@ -410,8 +412,7 @@ function setLang(l) {
   setGreeting();
   if (state.email) {
     syncModal();
-    renderTimeline();
-    renderMenu();
+    refreshActiveScope();
     renderNotifState();
     renderFriends();
     renderGroupsList();
@@ -782,12 +783,16 @@ function dayLabel(iso) {
 }
 
 async function renderTimeline() {
+  if (state.scope === 'menu') return;
+  const scope = state.scope;
+  const groupId = state.groupId;
   let list = [];
   try {
     let query = '';
-    if (state.scope === 'friends' || state.scope === 'me') query = '?scope=' + state.scope;
-    else if (state.scope === 'group' && state.groupId) query = '?scope=group&groupId=' + encodeURIComponent(state.groupId);
+    if (scope === 'friends' || scope === 'me') query = '?scope=' + scope;
+    else if (scope === 'group' && groupId) query = '?scope=group&groupId=' + encodeURIComponent(groupId);
     const resp = await fetch('/api/announcements' + query, { headers: authHeaders() });
+    if (state.scope !== scope || (scope === 'group' && state.groupId !== groupId)) return;
     if (resp.status === 401) return handleAuthExpired();
     if (resp.status === 403) {
       state.scope = 'all';
@@ -796,6 +801,7 @@ async function renderTimeline() {
       return;
     }
     list = await resp.json();
+    if (state.scope !== scope || (scope === 'group' && state.groupId !== groupId)) return;
   } catch {
   }
   list.sort((a, b) => new Date(a.arrive) - new Date(b.arrive) || new Date(a.announceAt) - new Date(b.announceAt));
@@ -1084,6 +1090,7 @@ function start() {
   $('#scopeAllBtn').addEventListener('click', () => setScope('all'));
   $('#scopeFriendsBtn').addEventListener('click', () => setScope('friends'));
   $('#scopeGroupsBtn').addEventListener('click', () => setScope('group'));
+  $('#scopeMenuBtn').addEventListener('click', () => setScope('menu'));
   $('#groupCreate').addEventListener('click', createGroup);
   $('#groupJoin').addEventListener('click', joinGroup);
   $('#groupsClose').addEventListener('click', closeGroups);
@@ -1095,12 +1102,11 @@ function start() {
   });
   syncScopeTabs();
 
-  setInterval(renderTimeline, 30000);
+  setInterval(refreshActiveScope, 30000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { renderTimeline(); renderMenu(); }
+    if (!document.hidden) refreshActiveScope();
   });
-  renderTimeline();
-  renderMenu();
+  refreshActiveScope();
   fetchMyGroups();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   enablePush();
@@ -1373,14 +1379,25 @@ async function renderMenu() {
   container.appendChild(card);
 }
 
+function refreshActiveScope() {
+  if (state.scope === 'menu') renderMenu();
+  else renderTimeline();
+}
+
 function syncScopeTabs() {
   if (state.scope === 'me') {
     state.scope = 'all';
     localStorage.setItem('ru_scope', 'all');
   }
+  const menuVisible = state.scope === 'menu';
   $('#scopeAllBtn').classList.toggle('active', state.scope === 'all');
   $('#scopeFriendsBtn').classList.toggle('active', state.scope === 'friends');
   $('#scopeGroupsBtn').classList.toggle('active', state.scope === 'group');
+  $('#scopeMenuBtn').classList.toggle('active', menuVisible);
+  $('#menuSection').classList.toggle('hidden', !menuVisible);
+  $('#timeline').classList.toggle('hidden', menuVisible);
+  $('#empty').classList.add('hidden');
+  $('#announceBtn').classList.toggle('hidden', menuVisible);
   renderGroupBar();
 }
 
@@ -1394,7 +1411,7 @@ function setScope(s) {
     }
     fetchMyGroups();
   }
-  renderTimeline();
+  refreshActiveScope();
 }
 
 function openFriends() {
