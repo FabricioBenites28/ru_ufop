@@ -862,12 +862,6 @@ async function renderTimeline() {
     when.className = 'when';
     when.textContent = t('goToRU', { label: a.label });
     info.append(name, when);
-    if (a.groupName) {
-      const gtag = document.createElement('div');
-      gtag.className = 'course';
-      gtag.textContent = a.groupName;
-      info.appendChild(gtag);
-    }
     if (a.course) {
       const course = document.createElement('div');
       course.className = 'course';
