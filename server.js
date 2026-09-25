@@ -257,14 +257,19 @@ function sendNotifications(subs, payload) {
 }
 
 const PUSH_TEXT = {
-  going: { pt: 'Vai comer no RU {label}{group}', en: 'Going to the RU {label}{group}' },
+  going: { pt: 'Vai comer no RU {label}', en: 'Going to the RU {label}' },
   updated: { pt: 'Atualizou o horário: vai comer no RU {label}', en: 'Updated the time: going to the RU {label}' },
   joinsYou: { pt: 'Vai junto com você: {label}', en: 'Joining you: {label}' },
   arrived: { pt: 'chegou ao RU! {label}', en: 'arrived at the RU! {label}' },
+  soon: { pt: 'Vai comer no RU {label}', en: 'Going to the RU {label}' },
   friendAccept: { pt: 'aceitou seu pedido de amizade', en: 'accepted your friend request' },
   friendRequest: { pt: 'te mandou um pedido de amizade', en: 'sent you a friend request' },
   groupJoin: { pt: 'entrou no grupo {group}', en: 'joined the group {group}' },
   menuTitle: { pt: '🍽️ Cardápio atualizado', en: '🍽️ Menu updated' },
+};
+
+const PUSH_TITLE = {
+  soon: { pt: 'Falta pouco!', en: 'Almost time!' },
 };
 
 function pushFill(s, params) {
@@ -276,6 +281,11 @@ function subLang(sub) {
   return String((sub && sub.lang) || '').toLowerCase() === 'en' ? 'en' : 'pt';
 }
 
+function pushTitle(who, lang) {
+  if (who && typeof who === 'object') return String(who[lang] || who.pt || who.en || '');
+  return String(who || '');
+}
+
 function sendPushToEmails(emails, who, key, args) {
   const set = new Set((emails || []).map((e) => String(e).trim().toLowerCase()));
   const subs = db.subscriptions.filter((s) => set.has(s.email));
@@ -285,7 +295,7 @@ function sendPushToEmails(emails, who, key, args) {
   for (const l of ['pt', 'en']) {
     if (!byLang[l].length) continue;
     const body = pushFill(PUSH_TEXT[key][l] || '', args);
-    sendNotifications(byLang[l], JSON.stringify({ title: who, body }));
+    sendNotifications(byLang[l], JSON.stringify({ title: pushTitle(who, l), body }));
   }
 }
 
@@ -302,6 +312,35 @@ function sendPushMenu(meal, dateLabel) {
 function friendsOfEmail(email) {
   const u = db.users[email];
   return u && Array.isArray(u.friends) ? u.friends : [];
+}
+
+const REMINDER_MS = 30 * 60 * 1000;
+const REMINDER_TICK_MS = 60 * 1000;
+
+async function checkArrivalReminders() {
+  const now = Date.now();
+  const due = db.announcements.filter((a) => {
+    if (a.remindedAt) return false;
+    const at = new Date(a.arrive).getTime();
+    if (!Number.isFinite(at) || at <= now) return false;
+    return at - now <= REMINDER_MS;
+  });
+  if (!due.length) return 0;
+  for (const a of due) a.remindedAt = new Date().toISOString();
+  await save();
+  for (const a of due) {
+    const joins = Array.isArray(a.joins) ? a.joins : [];
+    const emails = [a.email, ...joins.map((j) => j && j.email).filter(Boolean)];
+    sendPushToEmails(emails, PUSH_TITLE.soon, 'soon', { label: a.label || '' });
+  }
+  console.log(`recordatório de 30min enviado para ${due.length} aviso(s)`);
+  return due.length;
+}
+
+function scheduleReminders() {
+  const run = () => checkArrivalReminders().catch((err) => console.error('erro no recordatório:', err.message));
+  setTimeout(run, 10 * 1000);
+  setInterval(run, REMINDER_TICK_MS);
 }
 
 function groupById(id) {
@@ -581,13 +620,11 @@ app.post('/api/announce', requireAuth, async (req, res) => {
   const info = arrivalInfo(req.body);
   if (!info) return res.status(400).json({ error: 'horário inválido' });
   const groupId = String(req.body.groupId || '').trim();
-  let groupName = '';
   if (groupId) {
     const g = groupById(groupId);
     if (!g || !g.members.includes(email)) {
       return res.status(403).json({ error: 'você não pertence a esse grupo' });
     }
-    groupName = g.name;
   }
   const userId = req.user.email;
   const now = Date.now();
@@ -611,7 +648,6 @@ app.post('/api/announce', requireAuth, async (req, res) => {
     exact: info.exact,
     label: info.label,
     groupId: groupId || '',
-    groupName: groupName || '',
   };
   db.announcements.push(announcement);
   await save();
@@ -619,7 +655,7 @@ app.post('/api/announce', requireAuth, async (req, res) => {
     ? groupMemberEmails(groupId).filter((e) => e && e !== email)
     : friendsOfEmail(email);
   if (pushEmails.length) {
-    sendPushToEmails(pushEmails, name, 'going', { label: info.label, group: groupName ? ` (${groupName})` : '' });
+    sendPushToEmails(pushEmails, name, 'going', { label: info.label });
   }
   res.json(announcement);
 });
@@ -637,6 +673,7 @@ app.put('/api/announce/:id', requireAuth, async (req, res) => {
     inMinutes: info.inMinutes,
     exact: info.exact,
     label: info.label,
+    remindedAt: '',
     updatedAt: new Date().toISOString(),
   };
   await save();
@@ -1057,6 +1094,7 @@ app.delete('/api/groups/:id', requireAuth, async (req, res) => {
 });
 
 loadData().then(() => {
+  scheduleReminders();
   app.listen(PORT, () => {
     console.log(`RU UFOP rodando na porta ${PORT}`);
     if (redis) {

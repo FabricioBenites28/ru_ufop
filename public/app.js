@@ -46,7 +46,7 @@ const I18N = {
     groupAllFeed: 'Todos (feed geral)',
     hoursSub: 'Segunda a sexta · 10:30–13:30 ou 18:00–19:30.',
     timeInvalid: 'Escolha um horário entre {windows}.',
-    announceSent: 'Aviso enviado!',
+    announceSent: 'Aviso criado corretamente!',
     announceUpdated: 'Horário atualizado!',
     announceFailed: 'Falha ao enviar. Tente de novo.',
     goToRU: 'Vai comer no RU {label}',
@@ -230,7 +230,7 @@ const I18N = {
     groupAllFeed: 'Everyone (general feed)',
     hoursSub: 'Mon–Fri · 10:30 AM–1:30 PM or 6 PM–7:30 PM.',
     timeInvalid: 'Pick a time between {windows}.',
-    announceSent: 'Announcement sent!',
+    announceSent: 'Announcement created correctly!',
     announceUpdated: 'Time updated!',
     announceFailed: 'Failed to send. Try again.',
     goToRU: 'Going to the RU {label}',
@@ -782,7 +782,7 @@ function dayLabel(iso) {
   return `${dayNames()[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`;
 }
 
-async function renderTimeline() {
+async function renderTimeline(highlightId) {
   if (state.scope === 'menu') return;
   const scope = state.scope;
   const groupId = state.groupId;
@@ -837,7 +837,7 @@ async function renderTimeline() {
       container.appendChild(group);
     }
     const card = document.createElement('div');
-    card.className = 'card ann';
+    card.className = 'card ann' + (highlightId && a.id === highlightId ? ' ann-new' : '');
 
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
@@ -954,6 +954,9 @@ async function renderTimeline() {
     }
 
     container.appendChild(card);
+    if (highlightId && a.id === highlightId) {
+      card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
   }
 }
 
@@ -1035,10 +1038,15 @@ async function confirmAnnounce() {
     });
     if (resp.status === 401) return handleAuthExpired();
     if (!resp.ok) throw new Error('invalid');
+    const created = await resp.json().catch(() => null);
     state.editingId = '';
     closeModal();
     toast(isEdit ? t('announceUpdated') : t('announceSent'));
-    renderTimeline();
+    if (!isEdit && created && created.id) {
+      setTimeout(() => renderTimeline(created.id), 650);
+    } else {
+      renderTimeline();
+    }
   } catch {
     toast(t('announceFailed'));
   }
