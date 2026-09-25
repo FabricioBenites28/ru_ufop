@@ -5,8 +5,8 @@ const I18N = {
     greet: 'oi, {name}',
     brandSubDefault: 'quem vai comer?',
     logout: 'sair',
-    creditsBtn: 'créditos',
-    creditsTitle: 'Créditos',
+    creditsBtn: 'autores',
+    creditsTitle: 'Autores',
     creditsText: 'Mastermind: Jordana Roza (B. Jordan)<br>Creator: Fabricio Benites (Perú Power)',
     close: 'Fechar',
     cancel: 'Cancelar',
@@ -188,8 +188,8 @@ const I18N = {
     greet: 'hi, {name}',
     brandSubDefault: "who's eating?",
     logout: 'logout',
-    creditsBtn: 'credits',
-    creditsTitle: 'Credits',
+    creditsBtn: 'authors',
+    creditsTitle: 'Authors',
     creditsText: 'Mastermind: Jordana Roza (B. Jordan)<br>Creator: Fabricio Benites (Perú Power)',
     close: 'Close',
     cancel: 'Cancel',
@@ -507,7 +507,6 @@ function applyProfile(p) {
     pb.innerHTML = ICONS.user;
   }
   pb.classList.remove('hidden');
-  $('#logoutBtn').classList.remove('hidden');
   $('#announceBtn').classList.remove('hidden');
   $('#friendsBtn').classList.remove('hidden');
   $('#bottomNav').classList.remove('hidden');
@@ -525,6 +524,7 @@ function logout() {
   localStorage.removeItem('ru_email');
   localStorage.removeItem('ru_photo');
   localStorage.removeItem('ru_course');
+  $('#courseOverlay').classList.add('hidden');
   openLogin();
 }
 
@@ -537,7 +537,6 @@ function openLogin() {
   state.groups = [];
   state.groupId = '';
   state.announceGroup = '';
-  $('#logoutBtn').classList.add('hidden');
   $('#profileBtn').classList.add('hidden');
   $('#announceBtn').classList.add('hidden');
   $('#friendsBtn').classList.add('hidden');
@@ -1074,7 +1073,6 @@ function start() {
   $('#mealBack').addEventListener('click', () => goMenuStep(0));
   $('#previewBack').addEventListener('click', () => goMenuStep(0));
   $('#menuSave').addEventListener('click', saveMenu);
-  $('#logoutBtn').addEventListener('click', logout);
 
   $('#notifBtn').addEventListener('click', openNotifs);
   $('#notifClose').addEventListener('click', closeNotifs);
@@ -2053,6 +2051,7 @@ async function saveCourse() {
 
 $('#courseCancel').addEventListener('click', closeCourseSheet);
 $('#courseSave').addEventListener('click', saveCourse);
+$('#courseLogout').addEventListener('click', logout);
 $('#profileBtn').addEventListener('click', () => openCourseSheet(false));
 $('#creditsBtn').addEventListener('click', openCredits);
 $('#creditsClose').addEventListener('click', closeCredits);
