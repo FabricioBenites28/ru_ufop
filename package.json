@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test-persistence.js && node test-redis-secrets.js"
+    "test": "node test-persistence.js && node test-redis-secrets.js && node test-assets.js"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.4",

@@ -44,9 +44,12 @@ function assetVersion(name) {
 let INDEX_HTML = '';
 function buildIndex() {
   let html = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
-  html = html.replace('/app.js?v=res', `/app.js?v=${assetVersion('app.js')}`);
-  html = html.replace('/style.css?v=7', `/style.css?v=${assetVersion('style.css')}`);
-  html = html.replace('/logo_app.png?v=4', `/logo_app.png?v=${assetVersion('logo_app.png')}`);
+  for (const asset of ['app.js', 'style.css', 'logo_app_final.png']) {
+    html = html.replace(
+      new RegExp(`(/${asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\?v=[^"']+`, 'g'),
+      `$1?v=${assetVersion(asset)}`
+    );
+  }
   INDEX_HTML = html;
 }
 buildIndex();
