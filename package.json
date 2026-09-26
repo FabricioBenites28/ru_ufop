@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "icons": "node scripts/generate-icons.js",
     "test": "node test-persistence.js && node test-redis-secrets.js && node test-assets.js"
   },
   "dependencies": {
